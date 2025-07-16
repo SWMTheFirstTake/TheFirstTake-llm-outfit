@@ -178,10 +178,18 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
           
-          # 기존 프로세스 종료
+          # 더 안전한 방식
           echo "🔄 기존 서비스를 중지합니다..."
-          sudo systemctl stop llm-outfit-api 2>/dev/null || true
-          pkill -f "uvicorn main:app" 2>/dev/null || true
+          if sudo systemctl is-active --quiet llm-outfit-api; then
+              sudo systemctl stop llm-outfit-api
+              sleep 3
+          fi
+
+          # 프로세스 확인 후 종료
+          if pgrep -f "uvicorn main:app" > /dev/null; then
+              pkill -f "uvicorn main:app"
+              sleep 3
+          fi
           
           # 서비스 파일 생성
           echo "⚙️ 서비스 파일을 생성합니다..."
