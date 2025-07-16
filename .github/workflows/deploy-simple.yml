@@ -178,6 +178,20 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
           
+          # 환경변수 설정 (.env 파일 생성)
+          echo "🔐 환경변수를 설정합니다..."
+          cat > .env <<EOF
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          ENVIRONMENT=production
+          DEBUG=False
+          LLM_API_HOST=0.0.0.0
+          LLM_API_PORT=6020
+          LOG_LEVEL=INFO
+          EOF
+          
+          # .env 파일 권한 설정 (보안상 중요)
+          chmod 600 .env
+
           echo "🔄 기존 서비스를 중지합니다..."
           # 포트 기반 정리 (안전함)
           echo "포트 6020 정리 중..."
