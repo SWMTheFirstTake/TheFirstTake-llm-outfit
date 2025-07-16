@@ -155,7 +155,7 @@ jobs:
           echo "🚀 TheFirstTake LLM Outfit API 배포를 시작합니다..."
           
           # 프로젝트 디렉토리 확인 및 설정
-          PROJECT_DIR="/home/ubuntu/TheFirstTake-llm-outfit-api"
+          PROJECT_DIR="/home/ubuntu/TheFirstTake-llm-outfit"
           
           if [ ! -d "$PROJECT_DIR" ]; then
             echo "📁 프로젝트 디렉토리를 생성하고 리포지토리를 clone합니다..."
