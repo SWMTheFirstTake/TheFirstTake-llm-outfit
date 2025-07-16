@@ -180,16 +180,22 @@ jobs:
           
           # 더 안전한 방식
           echo "🔄 기존 서비스를 중지합니다..."
-          if sudo systemctl is-active --quiet llm-outfit-api; then
-              sudo systemctl stop llm-outfit-api
-              sleep 3
-          fi
 
-          # 프로세스 확인 후 종료
+          # 1단계: 프로세스부터 정리 (가장 확실함)
           if pgrep -f "uvicorn main:app" > /dev/null; then
+              echo "uvicorn 프로세스를 종료합니다..."
               pkill -f "uvicorn main:app"
               sleep 3
           fi
+
+          # 2단계: systemctl은 타임아웃과 함께 (선택적)
+          if timeout 10 sudo systemctl is-active --quiet llm-outfit-api 2>/dev/null; then
+              echo "systemctl로 서비스를 중지합니다..."
+              timeout 15 sudo systemctl stop llm-outfit-api 2>/dev/null || true
+              sleep 2
+          fi
+
+          echo "✅ 서비스 정리 완료"         
           
           # 서비스 파일 생성
           echo "⚙️ 서비스 파일을 생성합니다..."
