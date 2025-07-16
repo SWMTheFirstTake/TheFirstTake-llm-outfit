@@ -43,20 +43,17 @@ jobs:
         script: |
           echo "🚀 TheFirstTake LLM Outfit API 배포를 시작합니다..."
            # 프로젝트 디렉토리 확인 및 설정
-          PROJECT_DIR="/home/ubuntu/llm-outfit-api"
+          PROJECT_DIR="/home/ubuntu/TheFirstTake-llm-outfit-api"
           
           if [ ! -d "$PROJECT_DIR" ]; then
             echo "📁 프로젝트 디렉토리를 생성하고 리포지토리를 clone합니다..."
-            mkdir -p $PROJECT_DIR
+            mkdir -p $PROJECT_DIR && cd $PROJECT_DIR
+            git clone https://github.com/SWMTheFirstTake/TheFirstTake-llm-outfit.git .
           else
             echo "📁 기존 프로젝트 디렉토리를 사용합니다..."
+            cd $PROJECT_DIR
+            git pull origin main
           fi
-
-          # 프로젝트 디렉토리로 이동
-          cd /home/ubuntu/llm-outfit-api
-          
-          # Git에서 최신 코드 가져오기
-          git pull origin main
           
           # Python 가상환경 확인 및 생성
           if [ ! -d "venv" ]; then
