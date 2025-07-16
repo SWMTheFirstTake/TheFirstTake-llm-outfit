@@ -159,9 +159,9 @@ jobs:
           
           if [ ! -d "$PROJECT_DIR" ]; then
             echo "📁 프로젝트 디렉토리를 생성하고 리포지토리를 clone합니다..."
-            mkdir -p $PROJECT_DIR && cd $PROJECT_DIR
+            mkdir -p $PROJECT_DIR
             git clone https://github.com/SWMTheFirstTake/TheFirstTake-llm-outfit.git .
-            cd $PROJECT_DIR
+            cd TheFirstTake-llm-outfit
           else
             echo "📁 기존 프로젝트 디렉토리를 사용합니다..."
             cd $PROJECT_DIR
