@@ -1,4 +1,8 @@
 import openai
+import sys
+import os
+# 상위 디렉토리를 sys.path에 추가
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
 import logging
 

@@ -22,12 +22,17 @@ class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     
     # LLM 관련 설정
-    LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "gpt-3.5-turbo")
+    LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "gpt-4o-mini")
     LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1000"))
     LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.7"))
     
     # 로그 설정
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+
+    # Redis 설정
+    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
+    REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
     
     @classmethod
     def is_production(cls) -> bool:
