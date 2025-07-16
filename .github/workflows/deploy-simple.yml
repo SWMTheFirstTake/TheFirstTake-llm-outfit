@@ -179,20 +179,29 @@ jobs:
           pip install -r requirements.txt
           
           echo "🔄 기존 서비스를 중지합니다..."
+          # 포트 기반 정리 (안전함)
+          echo "포트 6020 정리 중..."
+          lsof -ti:6020 | xargs -r kill -TERM 2>/dev/null || true
+          sleep 3
 
-          echo "1단계: 현재 프로세스 목록 확인"
-          ps aux | grep uvicorn | head -5
+          # systemctl도 이제 안전하게 사용 가능
+          if sudo systemctl is-active --quiet llm-outfit-api; then
+              sudo systemctl stop llm-outfit-api
+              sleep 3
+          fi
+          # echo "1단계: 현재 프로세스 목록 확인"
+          # ps aux | grep uvicorn | head -5
 
-          echo "2단계: 포트 사용 상황 확인"
-          netstat -tlnp | grep 6020 || echo "포트 6020 사용 안함"
+          # echo "2단계: 포트 사용 상황 확인"
+          # netstat -tlnp | grep 6020 || echo "포트 6020 사용 안함"
 
-          echo "3단계: lsof로 정리"
-          lsof -ti:6020 | head -5 || echo "lsof 결과 없음"
+          # echo "3단계: lsof로 정리"
+          # lsof -ti:6020 | head -5 || echo "lsof 결과 없음"
 
-          echo "4단계: 실제 정리 실행"
-          lsof -ti:6020 | xargs -r kill -TERM 2>/dev/null || echo "kill 명령어 완료"
+          # echo "4단계: 실제 정리 실행"
+          # lsof -ti:6020 | xargs -r kill -TERM 2>/dev/null || echo "kill 명령어 완료"
 
-          echo "✅ 모든 단계 완료"
+          # echo "✅ 모든 단계 완료"
           
           # 서비스 파일 생성
           echo "⚙️ 서비스 파일을 생성합니다..."
