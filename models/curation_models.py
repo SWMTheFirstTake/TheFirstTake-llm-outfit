@@ -1,6 +1,8 @@
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, TypeVar, Generic
 from enum import Enum
+
+
 
 class CurationStyle(str, Enum):
     FORMAL = "formal"

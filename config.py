@@ -33,6 +33,12 @@ class Settings:
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
     REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
+
+    # 프롬프트 관리 설정
+    MAX_CONTEXT_LENGTH = 10000  # 최대 컨텍스트 길이
+    MAX_CONTEXT_LINES = 20      # 최대 컨텍스트 라인 수
+    CONTEXT_EXPIRE_TIME = 86400  # 24시간 (초)
+    RETURN_PROMPT_HISTORY = False  # 프롬프트 히스토리 반환 여부
     
     @classmethod
     def is_production(cls) -> bool:
