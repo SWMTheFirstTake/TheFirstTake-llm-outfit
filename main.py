@@ -521,5 +521,5 @@ async def generate_curation(request: ExpertChainRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    logger.info("🏃‍♂️ 패션 전문가 시스템 실행 중... 포트 8000")
-    uvicorn.run("main_simple_experts:app", host="0.0.0.0", port=8000, reload=True)
+    logger.info("🏃‍♂️ 패션 전문가 시스템 실행 중... 포트 6020")
+    uvicorn.run("main_simple_experts:app", host="0.0.0.0", port=6020, reload=True)
