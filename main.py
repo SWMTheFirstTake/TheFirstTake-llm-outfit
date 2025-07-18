@@ -297,9 +297,9 @@ class SimpleFashionExpertService:
             },
             FashionExpertType.TREND_EXPERT: {
                 "role": "패션 트렌드 전문가",
-                "expertise": "최신트렌드, 브랜드분석, 셀럽스타일",
-                "focus": "최신 패션 트렌드와 브랜드 특성, 인플루언서 스타일을 반영한 추천을 제공합니다.",
-                "prompt_template": "현재 트렌드와 인기 브랜드, 셀럽 스타일을 고려하고 있음을 알려주고 트렌디한 옷을 한 줄 이내로 추천해주세요."
+                "expertise": "최신트렌드, 셀럽스타일",
+                "focus": "최신 패션 트렌드, 인플루언서 스타일을 반영한 추천을 제공합니다.",
+                "prompt_template": "현재 트렌드와 셀럽 스타일을 고려하고 있음을 알려주고 트렌디한 옷을 한 줄 이내로 추천해주세요."
             },
             # FashionExpertType.BUDGET_MANAGER: {
             #     "role": "패션 예산 관리 전문가", 
@@ -311,7 +311,7 @@ class SimpleFashionExpertService:
                 "role": "퍼스널 컬러 전문가",
                 "expertise": "퍼스널컬러, 색상조합, 톤온톤", 
                 "focus": "개인의 피부톤과 어울리는 색상 분석과 조화로운 컬러 조합을 제안합니다.",
-                "prompt_template": "퍼스널 컬러와 색상 조합을 고려하고 있음을 알려주고 어울리는 색상의 옷을 한 줄 이내로 추천해주세요."
+                "prompt_template": "퍼스널 컬러와 색상 조합을 고려하고 있음을 알려주고 어울리는 색상의 옷을 한 줄 이내로 추천해주세요. 성별과 피부톤을 사용자가 알려주지 않은 경우에는 일반적인 20대 남자로 가정하고, 사용자에게 물어보세요."
             },
             # FashionExpertType.TPO_EXPERT: {
             #     "role": "TPO 상황별 패션 전문가",
@@ -322,8 +322,8 @@ class SimpleFashionExpertService:
             FashionExpertType.FITTING_COORDINATOR: {
                 "role": "가상 피팅 코디네이터",
                 "expertise": "피팅연동, 결과분석, 대안제시",
-                "focus": "모든 전문가의 의견을 종합하여 최종 코디네이션을 완성하고 대안을 제시합니다.",
-                "prompt_template": "앞선 전문가들의 조언을 종합하여 완성된 코디네이션과 대안 스타일을 한 줄 이내로 제안해주세요."
+                "focus": "모든 전문가의 의견을 종합하여 최종 코디네이션을 완성합니다.",
+                "prompt_template": "앞선 전문가들의 조언을 종합하여 완성된 코디네이션을 한 줄 이내로 제안해주세요."
             }
         }
     
@@ -405,7 +405,7 @@ class SimpleFashionExpertService:
         for result in expert_results:
             synthesis += f"🔹 {result['expert_role']}: {result['analysis'][:150]}...\n\n"
         
-        synthesis += "📋 최종 추천: 모든 전문가의 조언을 종합하여 가장 적합한 스타일을 선택하시기 바랍니다."
+        synthesis += "📋 최종 추천: 모든 전문가의 조언을 종합하여 가장 적합한 단 하나의 스타일을 선택하시기 바랍니다. 대안 없이."
         
         return synthesis
     
