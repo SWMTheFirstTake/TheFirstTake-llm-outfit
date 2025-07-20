@@ -1,173 +1,3 @@
-# # main_simple.py - Redis 없이 간단 테스트용
-# from fastapi import FastAPI, HTTPException
-# from pydantic import BaseModel
-# from typing import List, Optional, Any
-# from enum import Enum
-# import asyncio
-# import openai
-# from config import settings
-# import logging
-
-# app = FastAPI(title="Fashion Curation API", version="2.0.0")
-
-# # 모델 정의
-# class ResponseModel(BaseModel):
-#     success: bool = True
-#     message: str = "Success"
-#     data: Any = None
-
-# class CurationStyle(str, Enum):
-#     FORMAL = "formal"
-#     CASUAL = "casual"
-#     CITY_BOY = "city_boy"
-
-# class CurationRequest(BaseModel):
-#     user_input: str
-#     room_id: int
-#     styles: Optional[List[CurationStyle]] = [CurationStyle.FORMAL, CurationStyle.CASUAL, CurationStyle.CITY_BOY]
-
-# class PromptRequest(BaseModel):
-#     prompt: str
-
-# # 간단한 프롬프트 매니저 (메모리 기반)
-# class SimplePromptManager:
-#     def __init__(self):
-#         self.contexts = {}  # 메모리에 저장
-#         self.style_templates = {
-#             CurationStyle.FORMAL: "라는 사용자의 질문에 대해 웬만하면 포멀한 스타일로 스타일 한 개만 추천해줘",
-#             CurationStyle.CASUAL: "라는 사용자의 질문에 대해 웬만하면 캐쥬얼한 스타일로 스타일 한 개만 추천해줘",
-#             CurationStyle.CITY_BOY: "라는 사용자의 질문에 대해 웬만하면 시티보이 스타일로 스타일 한 개만 추천해줘"
-#         }
-    
-#     def get_or_create_prompt_context(self, room_id: int, user_input: str) -> str:
-#         existing_context = self.contexts.get(room_id, "")
-#         if existing_context:
-#             return existing_context + "\n" + user_input
-#         else:
-#             return user_input
-    
-#     def build_style_prompt(self, context: str, style: CurationStyle) -> str:
-#         style_addition = self.style_templates.get(style, "")
-#         return context + style_addition
-    
-#     def update_prompt_context(self, room_id: int, new_context: str):
-#         self.contexts[room_id] = new_context
-    
-#     def clear_context(self, room_id: int):
-#         self.contexts.pop(room_id, None)
-
-# # 간단한 큐레이션 서비스
-# class SimpleCurationService:
-#     def __init__(self):
-#         self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-#         self.prompt_manager = SimplePromptManager()
-    
-#     async def generate_curation_response(self, request: CurationRequest):
-#         current_context = self.prompt_manager.get_or_create_prompt_context(
-#             request.room_id, 
-#             request.user_input
-#         )
-        
-#         tasks = []
-#         for style in request.styles:
-#             task = self._generate_single_curation(current_context, style)
-#             tasks.append(task)
-        
-#         curation_results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-#         results = []
-#         context_builder = [current_context]
-        
-#         for i, (style, result) in enumerate(zip(request.styles, curation_results)):
-#             if isinstance(result, Exception):
-#                 content = "큐레이션 결과를 가져오는 중 오류가 발생했습니다."
-#             else:
-#                 content = result + f" ({i+1}번째 AI)"
-#                 context_builder.append(content)
-            
-#             results.append({
-#                 "style": style.value,
-#                 "content": content
-#             })
-        
-#         updated_context = '\n'.join(context_builder)
-#         self.prompt_manager.update_prompt_context(request.room_id, updated_context)
-        
-#         return {
-#             "room_id": request.room_id,
-#             "results": results
-#         }
-    
-#     async def _generate_single_curation(self, context: str, style: CurationStyle) -> str:
-#         try:
-#             style_prompt = self.prompt_manager.build_style_prompt(context, style)
-            
-#             loop = asyncio.get_event_loop()
-#             response = await loop.run_in_executor(
-#                 None, 
-#                 self._call_openai_sync,
-#                 style_prompt
-#             )
-            
-#             return response
-#         except Exception as e:
-#             logging.error(f"OpenAI 호출 실패: {e}")
-#             raise e
-    
-#     def _call_openai_sync(self, user_prompt: str) -> str:
-#         response = self.client.chat.completions.create(
-#             model=settings.LLM_MODEL_NAME,
-#             messages=[
-#                 {"role": "system", "content": "당신은 의상 추천 전문가입니다."},
-#                 {"role": "user", "content": user_prompt}
-#             ],
-#             max_tokens=settings.LLM_MAX_TOKENS,
-#             temperature=settings.LLM_TEMPERATURE
-#         )
-#         return response.choices[0].message.content
-
-# # 서비스 인스턴스
-# curation_service = SimpleCurationService()
-
-# # API 엔드포인트
-# @app.post("/api/curation")
-# async def generate_curation(request: CurationRequest):
-#     try:
-#         result = await curation_service.generate_curation_response(request)
-#         return ResponseModel(data=result)
-#     except Exception as e:
-#         logging.error(f"큐레이션 생성 실패: {e}")
-#         raise HTTPException(status_code=500, detail=str(e))
-
-# @app.post("/api/ask")
-# def ask_single(request: PromptRequest):
-#     try:
-#         response = curation_service.client.chat.completions.create(
-#             model=settings.LLM_MODEL_NAME,
-#             messages=[
-#                 {"role": "system", "content": "당신은 의상 추천 전문가입니다."},
-#                 {"role": "user", "content": request.prompt}
-#             ],
-#             max_tokens=settings.LLM_MAX_TOKENS,
-#             temperature=settings.LLM_TEMPERATURE
-#         )
-#         return ResponseModel(data=response.choices[0].message.content)
-#     except Exception as e:
-#         logging.error(f"단일 프롬프트 실패: {e}")
-#         raise HTTPException(status_code=500, detail=str(e))
-
-# @app.get("/api/test")
-# def test():
-#     return {"message": "Hello, World!"}
-
-# @app.get("/health")
-# def health_check():
-#     return {"status": "healthy"}
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run("main_simple:app", host="0.0.0.0", port=6020, reload=True)
-# main_simple_experts.py - 전문가 시스템 적용
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
@@ -231,13 +61,13 @@ class SimpleFashionExpertService:
                 "role": "패션 스타일 분석 전문가",
                 "expertise": "체형분석, 핏감분석, 실루엣",
                 "focus": "사용자의 체형과 어울리는 스타일을 분석하고 핏감을 고려한 추천을 제공합니다.",
-                "prompt_template": "체형분석과 핏감을 중심으로 고려하고 있음을 알려주고 어울리는 실루엣과 스타일을 한 줄 이내로 추천해주세요. 성별은 모르겠으면 물어보거나, 20대 남자로 가정하세요."
+                "prompt_template": "이전 전문가의 의견을 참고하되, 당신의 전문 분야인 체형분석과 핏감 관점에서 독립적으로 평가하세요. 동의할 수도 있고, 다른 관점에서 우려사항이나 대안을 제시할 수도 있습니다. 당신의 전문적 판단을 솔직하게 표현하고, 체형과 실루엣 관점에서 어울리는 스타일을 추천해주세요. 반드시 구체적인 색상(네이비, 베이지, 화이트, 차콜, 블랙, 그레이 등), 소재(코튼, 린넨, 울, 데님 등), 핏(슬림핏, 레귤러핏, 오버핏 등)을 포함해서 추천해주세요. 간결하고 자연스러운 문장으로 추천하고, 마지막에 조합에 대한 한 줄 평을 추가하세요. 성별은 모르겠으면 물어보거나, 20대 남자로 가정하세요."
             },
             FashionExpertType.TREND_EXPERT: {
                 "role": "패션 트렌드 전문가",
-                "expertise": "최신트렌드, 브랜드분석, 셀럽스타일",
-                "focus": "최신 패션 트렌드와 브랜드 특성, 인플루언서 스타일을 반영한 추천을 제공합니다.",
-                "prompt_template": "현재 트렌드와 인기 브랜드, 셀럽 스타일을 고려하고 있음을 알려주고 트렌디한 옷을 한 줄 이내로 추천해주세요."
+                "expertise": "최신트렌드, 셀럽스타일",
+                "focus": "최신 패션 트렌드, 인플루언서 스타일을 반영한 추천을 제공합니다.",
+                "prompt_template": "이전 전문가의 의견을 고려하되, 트렌드 전문가로서 당신만의 관점을 유지하세요. 현재 트렌드와 맞지 않거나 오버된 스타일이라면 솔직하게 지적하고, 트렌디한 대안을 제시하세요. 때로는 이전 의견에 동의하지 않을 수도 있습니다. 현재 트렌드와 셀럽 스타일을 기준으로 한 당신의 솔직한 평가와 추천을 해주세요. 반드시 구체적인 색상(라벤더, 세이지 그린, 테라코타, 네이비, 베이지, 화이트 등), 소재(코튼, 린넨, 울, 데님 등), 핏(슬림핏, 레귤러핏, 오버핏 등)을 포함해서 추천해주세요. 간결하고 자연스러운 문장으로 추천하고, 마지막에 조합에 대한 한 줄 평을 추가하세요."
             },
             # FashionExpertType.BUDGET_MANAGER: {
             #     "role": "패션 예산 관리 전문가", 
@@ -249,7 +79,7 @@ class SimpleFashionExpertService:
                 "role": "퍼스널 컬러 전문가",
                 "expertise": "퍼스널컬러, 색상조합, 톤온톤", 
                 "focus": "개인의 피부톤과 어울리는 색상 분석과 조화로운 컬러 조합을 제안합니다.",
-                "prompt_template": "퍼스널 컬러와 색상 조합을 고려하고 있음을 알려주고 어울리는 색상의 옷을 한 줄 이내로 추천해주세요."
+                "prompt_template": "이전 전문가들의 의견을 참고하되, 컬러 전문가로서 당신의 독립적인 판단을 유지하세요. 색상 조합이 부적절하거나 퍼스널 컬러와 맞지 않는다면 솔직하게 지적하고, 더 나은 색상 대안을 제시하세요. 때로는 이전 의견에 동의하지 않을 수도 있습니다. 퍼스널 컬러와 색상 조합 관점에서 당신의 솔직한 평가와 추천을 해주세요. 반드시 구체적인 색상(네이비, 베이지, 화이트, 차콜, 블랙, 그레이, 라벤더, 세이지 그린 등), 소재(코튼, 린넨, 울, 데님 등), 핏(슬림핏, 레귤러핏, 오버핏 등)을 포함해서 추천해주세요. 간결하고 자연스러운 문장으로 추천하고, 마지막에 조합에 대한 한 줄 평을 추가하세요. 성별과 피부톤을 사용자가 알려주지 않은 경우에는 일반적인 20대 남자로 가정하고, 사용자에게 물어보세요."
             },
             # FashionExpertType.TPO_EXPERT: {
             #     "role": "TPO 상황별 패션 전문가",
@@ -260,8 +90,8 @@ class SimpleFashionExpertService:
             FashionExpertType.FITTING_COORDINATOR: {
                 "role": "가상 피팅 코디네이터",
                 "expertise": "피팅연동, 결과분석, 대안제시",
-                "focus": "모든 전문가의 의견을 종합하여 최종 코디네이션을 완성하고 대안을 제시합니다.",
-                "prompt_template": "앞선 전문가들의 조언을 종합하여 완성된 코디네이션과 대안 스타일을 한 줄 이내로 제안해주세요."
+                "focus": "모든 전문가의 의견을 종합하여 최종 코디네이션을 완성합니다.",
+                "prompt_template": "앞선 전문가들의 다양한 의견을 종합하여 최종 평가를 내려주세요. 모든 의견이 일치하지 않을 수 있으니, 각 전문가의 관점을 고려하면서도 최종적으로 가장 적합한 코디네이션을 제안해주세요. 의견이 충돌하는 부분이 있다면 그 이유와 함께 최종 판단을 설명해주세요. 최종 추천에서는 반드시 구체적인 색상(네이비, 베이지, 화이트, 차콜, 블랙, 그레이 등), 소재(코튼, 린넨, 울, 데님 등), 핏(슬림핏, 레귤러핏, 오버핏 등)을 포함해서 추천해주세요. 간결하고 자연스러운 문장으로 추천하고, 마지막에 조합에 대한 한 줄 평을 추가하세요."
             }
         }
     
@@ -280,12 +110,43 @@ class SimpleFashionExpertService:
         
         context_parts.append(f"\n{expert_profile['role']}으로서 {expert_profile['prompt_template']}")
         
+        # 구체적 형식 강조
+        context_parts.append("\n⚠️ 중요: 추천할 때 반드시 '색상+소재+핏+아이템명' 형식으로 구체적으로 표현하세요.")
+        context_parts.append("간결하고 자연스러운 문장으로 추천하고, 마지막에 조합에 대한 한 줄 평을 추가하세요.")
+        context_parts.append("예시: '네이비 코튼 슬림핏 셔츠와 베이지 울 레귤러핏 팬츠를 추천드려요. 깔끔하면서도 세련된 느낌을 줄 수 있어요.'")
+        context_parts.append("추상적인 표현(예: '슬림핏 셔츠', '다크 진')은 사용하지 마세요.")
+        
         expert_prompt = "\n\n".join(context_parts)
         
         # OpenAI 호출
         try:
+            system_prompt = f"""당신은 {expert_profile['role']}입니다. {expert_profile['focus']} 전문 영역: {expert_profile['expertise']}
+
+중요한 원칙:
+1. 당신의 전문 분야에 대한 독립적인 판단을 유지하세요
+2. 이전 전문가의 의견에 무조건 동의하지 마세요
+3. 당신의 관점에서 문제점이나 우려사항이 있다면 솔직하게 표현하세요
+4. 때로는 이전 의견과 다른 대안을 제시하는 것이 좋습니다
+5. 당신의 전문성을 바탕으로 한 솔직하고 건설적인 피드백을 제공하세요
+
+구체적 정보 포함 필수:
+- 반드시 색상을 명시하세요 (예: 네이비, 베이지, 화이트, 차콜, 블랙, 그레이 등)
+- 소재를 명시하세요 (예: 코튼, 린넨, 울, 데님, 실크 등)
+- 핏을 명시하세요 (예: 슬림핏, 레귤러핏, 오버핏, 루즈핏 등)
+- 구체적인 아이템명을 사용하세요 (예: "슬림핏 셔츠" 대신 "네이비 코튼 슬림핏 셔츠")
+
+응답 형식:
+- 간결하고 자연스러운 문장으로 추천하세요
+- "색상+소재+핏+아이템명" 형식으로 구체적으로 표현
+- 마지막에 조합에 대한 한 줄 평을 추가하세요
+- 예시: "네이비 코튼 슬림핏 셔츠와 베이지 울 레귤러핏 팬츠를 추천드려요. 깔끔하면서도 세련된 느낌을 줄 수 있어요."
+
+추상적인 표현 금지:
+- "예쁜 옷", "멋진 스타일" 같은 추상적 표현 사용 금지
+- 반드시 구체적인 색상, 소재, 핏 정보를 포함해야 합니다"""
+            
             response = await self._call_openai_async(
-                f"당신은 {expert_profile['role']}입니다. {expert_profile['focus']} 전문 영역: {expert_profile['expertise']}",
+                system_prompt,
                 expert_prompt
             )
             
@@ -305,7 +166,7 @@ class SimpleFashionExpertService:
         expert_results = []
         accumulated_insights = []
         
-        for expert_type in request.expert_sequence:
+        for expert_type in request.expert_sequence or []:
             # 이전 전문가들의 결과를 컨텍스트에 포함
             current_context = request.context_info or {}
             if accumulated_insights:
@@ -343,7 +204,7 @@ class SimpleFashionExpertService:
         for result in expert_results:
             synthesis += f"🔹 {result['expert_role']}: {result['analysis'][:150]}...\n\n"
         
-        synthesis += "📋 최종 추천: 모든 전문가의 조언을 종합하여 가장 적합한 스타일을 선택하시기 바랍니다."
+        synthesis += "📋 최종 추천: 모든 전문가의 조언을 종합하여 가장 적합한 단 하나의 스타일을 선택하시기 바랍니다. 대안 없이."
         
         return synthesis
     
@@ -369,7 +230,10 @@ class SimpleFashionExpertService:
             max_tokens=settings.LLM_MAX_TOKENS,
             temperature=settings.LLM_TEMPERATURE
         )
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        if content is None:
+            return "응답을 생성할 수 없습니다."
+        return content
 
 # 서비스 인스턴스
 expert_service = SimpleFashionExpertService()
@@ -459,5 +323,5 @@ async def generate_curation(request: ExpertChainRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    logger.info("🏃‍♂️ 패션 전문가 시스템 실행 중... 포트 8000")
-    uvicorn.run("main_simple_experts:app", host="0.0.0.0", port=8000, reload=True)
+    logger.info("🏃‍♂️ 패션 전문가 시스템 실행 중... 포트 6020")
+    uvicorn.run("main_simple_experts:app", host="0.0.0.0", port=6020, reload=True)
