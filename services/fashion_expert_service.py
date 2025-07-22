@@ -1,6 +1,7 @@
 import asyncio
 import openai
 import logging
+import anthropic
 from typing import List, Dict
 from config import settings
 from models.fashion_models import FashionExpertType, ExpertAnalysisRequest
@@ -9,8 +10,8 @@ logger = logging.getLogger(__name__)
 
 class SimpleFashionExpertService:
     def __init__(self):
-        self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-        
+        # self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = anthropic.Anthropic(api_key=settings.CLAUDE_API_KEY)  # 추가
         # 전문가별 특성 정의
         self.expert_profiles = {
             FashionExpertType.STYLE_ANALYST: {
@@ -176,17 +177,32 @@ class SimpleFashionExpertService:
         return response
     
     def _call_openai_sync(self, system_prompt: str, user_prompt: str) -> str:
-        """동기 OpenAI 호출"""
-        response = self.client.chat.completions.create(
+        # """동기 OpenAI 호출"""
+        # response = self.client.chat.completions.create(
+        #     model=settings.LLM_MODEL_NAME,
+        #     messages=[
+        #         {"role": "system", "content": system_prompt},
+        #         {"role": "user", "content": user_prompt}
+        #     ],
+        #     max_tokens=settings.LLM_MAX_TOKENS,
+        #     temperature=settings.LLM_TEMPERATURE
+        # )
+        # content = response.choices[0].message.content
+        # if content is None:
+        #     return "응답을 생성할 수 없습니다."
+        # return content 
+        """Claude API 호출로 변경"""
+        response = self.client.messages.create(
             model=settings.LLM_MODEL_NAME,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
             max_tokens=settings.LLM_MAX_TOKENS,
-            temperature=settings.LLM_TEMPERATURE
+            temperature=settings.LLM_TEMPERATURE,
+            system=system_prompt,  # Claude는 system 파라미터 사용
+            messages=[
+                {"role": "user", "content": user_prompt}
+            ]
         )
-        content = response.choices[0].message.content
+        content = response.content[0].text  # Claude 응답 구조
         if content is None:
             return "응답을 생성할 수 없습니다."
-        return content 
+        return content
+        
