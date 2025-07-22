@@ -15,7 +15,14 @@ from services.claude_vision_service import ClaudeVisionService
 logger = logging.getLogger(__name__)
 
 # 서비스 인스턴스
-expert_service = SimpleFashionExpertService()
+expert_service=None
+try:
+    expert_service = SimpleFashionExpertService(api_key=settings.CLAUDE_API_KEY)
+    print("✅ SimpleFashionExpertService 초기화 성공")
+    print(f"✅ 서비스 타입: {type(expert_service)}")
+except Exception as e:
+    print(f"❌ SimpleFashionExpertService 초기화 실패: {e}")
+    expert_service = None
 
 # ✅ ClaudeVisionService 한 번만 초기화
 claude_vision_service = None

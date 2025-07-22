@@ -4,6 +4,10 @@ from dotenv import load_dotenv
 # .env 파일 로드 (로컬 개발용)
 load_dotenv()
 
+# API 키 디버깅
+print(f"🔍 환경변수 CLAUDE_API_KEY: {os.getenv('CLAUDE_API_KEY', 'NOT_SET')}")
+print(f"🔍 환경변수 CLAUDE_API_KEY 길이: {len(os.getenv('CLAUDE_API_KEY', ''))}")
+
 class Settings:
     """애플리케이션 설정"""
     
@@ -21,10 +25,13 @@ class Settings:
     # 외부 API 키 (필요시)
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     CLAUDE_API_KEY: str = os.getenv("CLAUDE_API_KEY", "")
+    print(CLAUDE_API_KEY)
 
     # LLM 관련 설정
     # LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "gpt-4o-mini")
-    LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "claude-3-5-sonnet-20241022")  # Claude 모델로 변경
+    # LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "claude-3-5-sonnet-20241022")  # Claude 모델로 변경
+    # LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "claude-sonnet-4-20250514")  # Claude 모델로 변경
+    LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "claude-3-haiku-20240307")  # Claude 모델로 변경
     LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1000"))
     LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.7"))
     

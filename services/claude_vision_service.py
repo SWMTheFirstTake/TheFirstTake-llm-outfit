@@ -3,6 +3,13 @@ import base64
 
 class ClaudeVisionService:
     def __init__(self, api_key: str):
+        # API 키 상태 확인
+        print(f"🔍 ClaudeVisionService API 키 상태: {'설정됨' if api_key else '설정되지 않음'}")
+        print(f"🔍 ClaudeVisionService API 키 길이: {len(api_key) if api_key else 0}")
+        
+        if not api_key:
+            raise ValueError("ClaudeVisionService: API 키가 설정되지 않았습니다.")
+        
         self.client = anthropic.Anthropic(api_key=api_key)
         print(f"🔍 ClaudeVisionService 초기화 완료")
 

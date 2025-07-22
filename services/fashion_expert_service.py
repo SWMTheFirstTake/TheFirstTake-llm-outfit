@@ -2,16 +2,25 @@ import asyncio
 import openai
 import logging
 import anthropic
-from typing import List, Dict
+from typing import List, Dict, Optional
 from config import settings
 from models.fashion_models import FashionExpertType, ExpertAnalysisRequest
 
 logger = logging.getLogger(__name__)
 
 class SimpleFashionExpertService:
-    def __init__(self):
+    def __init__(self, api_key: str):
         # self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-        self.client = anthropic.Anthropic(api_key=settings.CLAUDE_API_KEY)  # 추가
+        self.client = anthropic.Anthropic(api_key=api_key)
+        # API 키 상태 확인
+        print(f"🔍 CLAUDE_API_KEY 상태: {'설정됨' if api_key else '설정되지 않음'}")
+        print(f"🔍 CLAUDE_API_KEY 길이: {len(api_key) if api_key else 0}")
+        print(f"🔍 CLAUDE_API_KEY 앞 10자: {api_key[:10] if api_key else 'None'}")
+        
+        # if not settings.CLAUDE_API_KEY:
+        #     raise ValueError("CLAUDE_API_KEY가 설정되지 않았습니다. 환경변수를 확인해주세요.")
+        if not api_key:
+            raise ValueError("CLAUDE_API_KEY가 설정되지 않았습니다. 환경변수를 확인해주세요.")
         # 전문가별 특성 정의
         self.expert_profiles = {
             FashionExpertType.STYLE_ANALYST: {
@@ -85,6 +94,7 @@ class SimpleFashionExpertService:
 3. 당신의 관점에서 문제점이나 우려사항이 있다면 솔직하게 표현하세요
 4. 때로는 이전 의견과 다른 대안을 제시하는 것이 좋습니다
 5. 당신의 전문성을 바탕으로 한 솔직하고 건설적인 피드백을 제공하세요
+6. 최대한 간결하게 핵심만 전달하세요
 
 구체적 정보 포함 필수:
 - 반드시 색상을 명시하세요 (예: 네이비, 베이지, 화이트, 차콜, 블랙, 그레이 등)
@@ -94,6 +104,7 @@ class SimpleFashionExpertService:
 
 응답 형식:
 - 간결하고 자연스러운 문장으로 추천하세요
+- 최대한 간결하게 핵심만 전달하세요
 - "색상+소재+핏+아이템명" 형식으로 구체적으로 표현
 - 마지막에 조합에 대한 한 줄 평을 추가하세요
 - 예시: "네이비 코튼 슬림핏 셔츠와 베이지 울 레귤러핏 팬츠를 추천드려요. 깔끔하면서도 세련된 느낌을 줄 수 있어요."
@@ -149,10 +160,75 @@ class SimpleFashionExpertService:
         # 최종 종합
         return {
             "expert_analyses": expert_results,
-            # "expert_count": len(expert_results),
-            # "comprehensive_recommendation": self._synthesize_results(expert_results),
-            # "collaboration_flow": accumulated_insights
         }
+        
+    #     """전문가 체인 분석 - 비동기 동시 호출"""
+    #     expert_sequence = request.expert_sequence or [
+    #         FashionExpertType.STYLE_ANALYST,
+    #         FashionExpertType.COLOR_EXPERT, 
+    #         FashionExpertType.TREND_EXPERT,
+    #         FashionExpertType.FITTING_COORDINATOR
+    #     ]
+        
+    #     # 2개 전문가만 동시 호출 (테스트용)
+    #     expert_sequence = expert_sequence[:2]
+        
+    #     # 세마포어로 동시 요청 수 제한 (Claude API 제한 고려)
+    #     semaphore = asyncio.Semaphore(2)  # 최대 2개 동시 요청
+        
+    #     # 비동기로 모든 전문가 동시 호출
+    #     async def call_expert(expert_type):
+    #         async with semaphore:
+    #             expert_request = ExpertAnalysisRequest(
+    #                 user_input=request.user_input,
+    #                 room_id=request.room_id,
+    #                 expert_type=expert_type,
+    #                 user_profile=request.user_profile,
+    #                 context_info=request.context_info
+    #             )
+    #             return await self.get_single_expert_analysis(expert_request)
+        
+    #     # 모든 전문가를 동시에 호출 (타임아웃 30초)
+    #     try:
+    #         expert_results = await asyncio.wait_for(
+    #             asyncio.gather(*[call_expert(expert_type) for expert_type in expert_sequence]),
+    #             timeout=30.0
+    #         )
+    #     except asyncio.TimeoutError:
+    #         logger.error("전문가 체인 분석 타임아웃")
+    #         raise Exception("분석 시간이 초과되었습니다. 다시 시도해주세요.")
+        
+    #     return {
+    #         "expert_analyses": expert_results,
+    #     }
+    
+    # async def get_expert_chain_analysis_simple(self, request):
+    #     """전문가 체인 분석 - 간단한 비동기 버전 (테스트용)"""
+    #     expert_sequence = [
+    #         FashionExpertType.STYLE_ANALYST,
+    #         FashionExpertType.COLOR_EXPERT, 
+    #         FashionExpertType.TREND_EXPERT
+    #     ]
+        
+    #     # 각 전문가를 순차적으로 호출하되 비동기로 처리
+    #     tasks = []
+    #     for expert_type in expert_sequence:
+    #         expert_request = ExpertAnalysisRequest(
+    #             user_input=request.user_input,
+    #             room_id=request.room_id,
+    #             expert_type=expert_type,
+    #             user_profile=request.user_profile,
+    #             context_info=request.context_info
+    #         )
+    #         task = self.get_single_expert_analysis(expert_request)
+    #         tasks.append(task)
+        
+    #     # 모든 태스크를 동시에 실행
+    #     expert_results = await asyncio.gather(*tasks)
+        
+    #     return {
+    #         "expert_analyses": expert_results,
+    #     }
     
     def _synthesize_results(self, expert_results: List[Dict]) -> str:
         """전문가 결과 종합"""
