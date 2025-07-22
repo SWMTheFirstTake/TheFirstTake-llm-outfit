@@ -20,7 +20,8 @@ class Settings:
     
     # 외부 API 키 (필요시)
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    
+    CLAUDE_API_KEY: str = os.getenv("CLAUDE_API_KEY", "")
+
     # LLM 관련 설정
     LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "gpt-4o-mini")
     LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1000"))

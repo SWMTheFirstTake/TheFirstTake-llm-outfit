@@ -133,6 +133,20 @@ git push origin main
 
 Docker 관련 파일들을 사용하려면 `.github/workflows/deploy.yml`을 사용하세요.
 
+## 이미지 착장 분석 API (Claude Vision)
+
+- 엔드포인트: `POST /api/vision/analyze-outfit`
+- 요청: multipart/form-data로 이미지 파일 업로드 (필드명: `file`)
+- 응답 예시:
+
+```
+{
+  "analysis": "네이비 코튼 셔츠와 베이지 울 팬츠로 구성된 세련된 봄 코디입니다. ..."
+}
+```
+
+- 환경변수 또는 코드 내 `YOUR_CLAUDE_API_KEY`를 실제 API 키로 교체 필요
+
 ## �� 라이센스
 
 MIT License
