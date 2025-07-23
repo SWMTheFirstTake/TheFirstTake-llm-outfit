@@ -1,8 +1,8 @@
 import redis
 import json
 import logging
+import os
 from typing import Optional
-from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +17,16 @@ class RedisService:
         """Redis 연결"""
         try:
             self.redis_client = redis.Redis(
-                host=settings.REDIS_HOST,
-                port=settings.REDIS_PORT,
-                db=settings.REDIS_DB,
+                host=os.getenv("REDIS_HOST", "localhost"),
+                port=int(os.getenv("REDIS_PORT", "6379")),
+                db=int(os.getenv("REDIS_DB", "0")),
                 decode_responses=True,
                 socket_connect_timeout=5,
                 socket_timeout=5
             )
             # 연결 테스트
             self.redis_client.ping()
-            logger.info(f"✅ Redis 연결 성공: {settings.REDIS_HOST}:{settings.REDIS_PORT}")
+            logger.info(f"✅ Redis 연결 성공: {os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', '6379')}")
         except Exception as e:
             logger.error(f"❌ Redis 연결 실패: {e}")
             self.redis_client = None
@@ -59,16 +59,20 @@ class RedisService:
             # 새로운 내용 추가
             new_value = current_value + "\n" + content if current_value else content
             
-            # 최대 길이 제한 (설정값 참조)
-            if len(new_value) > settings.MAX_CONTEXT_LENGTH:
+            # 최대 길이 제한 (환경변수에서 직접 참조)
+            max_context_length = int(os.getenv("MAX_CONTEXT_LENGTH", "10000"))
+            max_context_lines = int(os.getenv("MAX_CONTEXT_LINES", "20"))
+            
+            if len(new_value) > max_context_length:
                 # 라인별로 분할하여 최근 N라인만 유지
                 lines = new_value.split('\n')
-                if len(lines) > settings.MAX_CONTEXT_LINES:
-                    lines = lines[-settings.MAX_CONTEXT_LINES:]
+                if len(lines) > max_context_lines:
+                    lines = lines[-max_context_lines:]
                 new_value = '\n'.join(lines)
             
             # Redis에 저장 (24시간 만료)
-            self.redis_client.setex(key, settings.CONTEXT_EXPIRE_TIME, new_value)
+            context_expire_time = int(os.getenv("CONTEXT_EXPIRE_TIME", "86400"))
+            self.redis_client.setex(key, context_expire_time, new_value)
             logger.info(f"Redis에 프롬프트 추가: {key} (길이: {len(new_value)})")
             return True
         except Exception as e:
@@ -83,7 +87,8 @@ class RedisService:
         
         try:
             key = f"{room_id}:prompt"
-            self.redis_client.setex(key, settings.CONTEXT_EXPIRE_TIME, content)
+            context_expire_time = int(os.getenv("CONTEXT_EXPIRE_TIME", "86400"))
+            self.redis_client.setex(key, context_expire_time, content)
             logger.info(f"Redis에 프롬프트 설정: {key} (길이: {len(content)})")
             return True
         except Exception as e:
