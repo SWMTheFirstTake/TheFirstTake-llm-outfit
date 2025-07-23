@@ -183,6 +183,8 @@ jobs:
           cat > .env <<EOF
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
           CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
+          REDIS_HOST=${{ secrets.REDIS_HOST }}
+          REDIS_PORT=${{ secrets.REDIS_PORT }}
           ENVIRONMENT=production
           DEBUG=False
           LLM_API_HOST=0.0.0.0
@@ -234,6 +236,8 @@ jobs:
           Environment=DEBUG=False
           Environment=LLM_API_HOST=0.0.0.0
           Environment=LLM_API_PORT=6020
+          Environment=REDIS_HOST=${{ secrets.REDIS_HOST }}
+          Environment=REDIS_PORT=${{ secrets.REDIS_PORT }}
           Environment=LOG_LEVEL=INFO
           ExecStart=$PROJECT_DIR/venv/bin/uvicorn main:app --host 0.0.0.0 --port 6020
           Restart=always
