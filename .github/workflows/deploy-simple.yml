@@ -1,3 +1,114 @@
+# # name: Deploy to EC2 (Simple)
+
+# # on:
+# #   push:
+# #     branches: [ main ]
+
+# # jobs:
+# #   test:
+# #     runs-on: ubuntu-latest
+    
+# #     steps:
+# #     - uses: actions/checkout@v4
+    
+# #     - name: Set up Python
+# #       uses: actions/setup-python@v4
+# #       with:
+# #         python-version: '3.11'
+    
+# #     - name: Install dependencies
+# #       run: |
+# #         python -m pip install --upgrade pip
+# #         pip install -r requirements.txt
+    
+# #     - name: Run tests
+# #       run: |
+# #         echo "테스트 실행 중..."
+# #         # python -m pytest
+
+# #   deploy:
+# #     needs: test
+# #     runs-on: ubuntu-latest
+# #     if: github.ref == 'refs/heads/main'
+    
+# #     steps:
+# #     - uses: actions/checkout@v4
+    
+# #     - name: Deploy to EC2
+# #       uses: appleboy/ssh-action@v1.0.0
+# #       with:
+# #         host: ${{ secrets.LLM_OUTFIT_EC2_HOST }}
+# #         username: ${{ secrets.LLM_OUTFIT_EC2_USERNAME }}
+# #         key: ${{ secrets.LLM_OUTFIT_EC2_SSH_KEY }}
+# #         script: |
+# #           echo "🚀 TheFirstTake LLM Outfit API 배포를 시작합니다..."
+# #            # 프로젝트 디렉토리 확인 및 설정
+# #           PROJECT_DIR="/home/ubuntu/TheFirstTake-llm-outfit-api"
+          
+# #           if [ ! -d "$PROJECT_DIR" ]; then
+# #             echo "📁 프로젝트 디렉토리를 생성하고 리포지토리를 clone합니다..."
+# #             mkdir -p $PROJECT_DIR && cd $PROJECT_DIR
+# #             git clone https://github.com/SWMTheFirstTake/TheFirstTake-llm-outfit.git .
+# #           else
+# #             echo "📁 기존 프로젝트 디렉토리를 사용합니다..."
+# #             cd $PROJECT_DIR
+# #             git pull origin main
+# #           fi
+          
+# #           # Python 가상환경 확인 및 생성
+# #           if [ ! -d "venv" ]; then
+# #             echo "📦 Python 가상환경을 생성합니다..."
+# #             python3 -m venv venv
+# #           fi
+          
+# #           # 가상환경 활성화 및 의존성 설치
+# #           source venv/bin/activate
+# #           pip install --upgrade pip
+# #           pip install -r requirements.txt
+          
+# #           # 기존 프로세스 종료
+# #           echo "🔄 기존 서비스를 중지합니다..."
+# #           sudo systemctl stop llm-outfit-api 2>/dev/null || true
+# #           pkill -f "uvicorn main:app" 2>/dev/null || true
+          
+# #           # 서비스 파일 생성
+# #           echo "⚙️ 서비스 파일을 생성합니다..."
+# #           sudo tee /etc/systemd/system/llm-outfit-api.service > /dev/null <<EOF
+# #           [Unit]
+# #           Description=TheFirstTake LLM Outfit API
+# #           After=network.target
+          
+# #           [Service]
+# #           Type=simple
+# #           User=ubuntu
+# #           WorkingDirectory=/home/ubuntu/llm-outfit-api
+# #           Environment=PATH=/home/ubuntu/llm-outfit-api/venv/bin
+# #           Environment=ENVIRONMENT=production
+# #           Environment=DEBUG=False
+# #           Environment=LLM_API_HOST=0.0.0.0
+# #           Environment=LLM_API_PORT=6020
+# #           Environment=LOG_LEVEL=INFO
+# #           ExecStart=/home/ubuntu/llm-outfit-api/venv/bin/uvicorn main:app --host 0.0.0.0 --port 6020
+# #           Restart=always
+# #           RestartSec=10
+          
+# #           [Install]
+# #           WantedBy=multi-user.target
+# #           EOF
+          
+# #           # 서비스 등록 및 시작
+# #           echo "🚀 서비스를 시작합니다..."
+# #           sudo systemctl daemon-reload
+# #           sudo systemctl enable llm-outfit-api
+# #           sudo systemctl start llm-outfit-api
+          
+# #           # 배포 확인
+# #           echo "✅ 배포가 완료되었습니다!"
+# #           echo "📍 서버 주소: http://${{ secrets.LLM_OUTFIT_EC2_HOST }}:6020"
+# #           echo "🔍 헬스 체크: http://${{ secrets.LLM_OUTFIT_EC2_HOST }}:6020/health"
+          
+# #           # 서비스 상태 확인
+# #           sudo systemctl status llm-outfit-api --no-pager 
 # name: Deploy to EC2 (Simple)
 
 # on:
@@ -42,13 +153,14 @@
 #         key: ${{ secrets.LLM_OUTFIT_EC2_SSH_KEY }}
 #         script: |
 #           echo "🚀 TheFirstTake LLM Outfit API 배포를 시작합니다..."
-#            # 프로젝트 디렉토리 확인 및 설정
-#           PROJECT_DIR="/home/ubuntu/TheFirstTake-llm-outfit-api"
+          
+#           # 프로젝트 디렉토리 확인 및 설정
+#           PROJECT_DIR="/home/ubuntu/TheFirstTake-llm-outfit"
           
 #           if [ ! -d "$PROJECT_DIR" ]; then
 #             echo "📁 프로젝트 디렉토리를 생성하고 리포지토리를 clone합니다..."
-#             mkdir -p $PROJECT_DIR && cd $PROJECT_DIR
-#             git clone https://github.com/SWMTheFirstTake/TheFirstTake-llm-outfit.git .
+#             git clone https://github.com/SWMTheFirstTake/TheFirstTake-llm-outfit.git
+#             cd $PROJECT_DIR
 #           else
 #             echo "📁 기존 프로젝트 디렉토리를 사용합니다..."
 #             cd $PROJECT_DIR
@@ -66,10 +178,47 @@
 #           pip install --upgrade pip
 #           pip install -r requirements.txt
           
-#           # 기존 프로세스 종료
+#           # 환경변수 설정 (.env 파일 생성)
+#           echo "🔐 환경변수를 설정합니다..."
+#           cat > .env <<EOF
+#           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+#           CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
+#           REDIS_HOST=${{ secrets.REDIS_HOST }}
+#           REDIS_PORT=${{ secrets.REDIS_PORT }}
+#           ENVIRONMENT=production
+#           DEBUG=False
+#           LLM_API_HOST=0.0.0.0
+#           LLM_API_PORT=6020
+#           LOG_LEVEL=INFO
+#           EOF
+          
+#           # .env 파일 권한 설정 (보안상 중요)
+#           chmod 600 .env
+
 #           echo "🔄 기존 서비스를 중지합니다..."
-#           sudo systemctl stop llm-outfit-api 2>/dev/null || true
-#           pkill -f "uvicorn main:app" 2>/dev/null || true
+#           # 포트 기반 정리 (안전함)
+#           echo "포트 6020 정리 중..."
+#           lsof -ti:6020 | xargs -r kill -TERM 2>/dev/null || true
+#           sleep 3
+
+#           # systemctl도 이제 안전하게 사용 가능
+#           if sudo systemctl is-active --quiet llm-outfit-api; then
+#               sudo systemctl stop llm-outfit-api
+#               sleep 3
+#           fi
+#           # echo "1단계: 현재 프로세스 목록 확인"
+#           # ps aux | grep uvicorn | head -5
+
+#           # echo "2단계: 포트 사용 상황 확인"
+#           # netstat -tlnp | grep 6020 || echo "포트 6020 사용 안함"
+
+#           # echo "3단계: lsof로 정리"
+#           # lsof -ti:6020 | head -5 || echo "lsof 결과 없음"
+
+#           # echo "4단계: 실제 정리 실행"
+#           # lsof -ti:6020 | xargs -r kill -TERM 2>/dev/null || echo "kill 명령어 완료"
+
+#           # echo "✅ 모든 단계 완료"
           
 #           # 서비스 파일 생성
 #           echo "⚙️ 서비스 파일을 생성합니다..."
@@ -81,14 +230,16 @@
 #           [Service]
 #           Type=simple
 #           User=ubuntu
-#           WorkingDirectory=/home/ubuntu/llm-outfit-api
-#           Environment=PATH=/home/ubuntu/llm-outfit-api/venv/bin
+#           WorkingDirectory=$PROJECT_DIR
+#           Environment=PATH=$PROJECT_DIR/venv/bin
 #           Environment=ENVIRONMENT=production
 #           Environment=DEBUG=False
 #           Environment=LLM_API_HOST=0.0.0.0
 #           Environment=LLM_API_PORT=6020
+#           Environment=REDIS_HOST=${{ secrets.REDIS_HOST }}
+#           Environment=REDIS_PORT=${{ secrets.REDIS_PORT }}
 #           Environment=LOG_LEVEL=INFO
-#           ExecStart=/home/ubuntu/llm-outfit-api/venv/bin/uvicorn main:app --host 0.0.0.0 --port 6020
+#           ExecStart=$PROJECT_DIR/venv/bin/uvicorn main:app --host 0.0.0.0 --port 6020
 #           Restart=always
 #           RestartSec=10
           
@@ -105,11 +256,10 @@
 #           # 배포 확인
 #           echo "✅ 배포가 완료되었습니다!"
 #           echo "📍 서버 주소: http://${{ secrets.LLM_OUTFIT_EC2_HOST }}:6020"
-#           echo "🔍 헬스 체크: http://${{ secrets.LLM_OUTFIT_EC2_HOST }}:6020/health"
           
 #           # 서비스 상태 확인
-#           sudo systemctl status llm-outfit-api --no-pager 
-name: Deploy to EC2 (Simple)
+#           sudo systemctl status llm-outfit-api --no-pager
+name: Deploy to EC2 (Fixed)
 
 on:
   push:
@@ -154,24 +304,32 @@ jobs:
         script: |
           echo "🚀 TheFirstTake LLM Outfit API 배포를 시작합니다..."
           
-          # 프로젝트 디렉토리 확인 및 설정
+          # 홈 디렉토리로 이동
+          cd /home/ubuntu
+          
+          # 프로젝트 디렉토리 설정
           PROJECT_DIR="/home/ubuntu/TheFirstTake-llm-outfit"
+          REPO_URL="https://github.com/SWMTheFirstTake/TheFirstTake-llm-outfit.git"
           
-          if [ ! -d "$PROJECT_DIR" ]; then
-            echo "📁 프로젝트 디렉토리를 생성하고 리포지토리를 clone합니다..."
-            git clone https://github.com/SWMTheFirstTake/TheFirstTake-llm-outfit.git
-            cd $PROJECT_DIR
-          else
-            echo "📁 기존 프로젝트 디렉토리를 사용합니다..."
-            cd $PROJECT_DIR
-            git pull origin main
+          # 기존 디렉토리가 있으면 완전 삭제 후 새로 clone (확실한 업데이트)
+          if [ -d "$PROJECT_DIR" ]; then
+            echo "📁 기존 프로젝트 디렉토리를 삭제합니다..."
+            rm -rf "$PROJECT_DIR"
           fi
           
-          # Python 가상환경 확인 및 생성
-          if [ ! -d "venv" ]; then
-            echo "📦 Python 가상환경을 생성합니다..."
-            python3 -m venv venv
-          fi
+          # 새로 clone
+          echo "📁 리포지토리를 새로 clone합니다..."
+          git clone "$REPO_URL"
+          cd "$PROJECT_DIR"
+          
+          # 현재 commit 확인 (디버깅용)
+          echo "📋 현재 commit 정보:"
+          git log --oneline -3
+          echo "📅 마지막 업데이트: $(git log -1 --format=%cd)"
+          
+          # Python 가상환경 생성
+          echo "📦 Python 가상환경을 생성합니다..."
+          python3 -m venv venv
           
           # 가상환경 활성화 및 의존성 설치
           source venv/bin/activate
@@ -192,33 +350,32 @@ jobs:
           LOG_LEVEL=INFO
           EOF
           
-          # .env 파일 권한 설정 (보안상 중요)
+          # .env 파일 권한 설정
           chmod 600 .env
-
-          echo "🔄 기존 서비스를 중지합니다..."
-          # 포트 기반 정리 (안전함)
+          
+          # 기존 서비스 완전 종료
+          echo "🔄 기존 서비스를 완전히 중지합니다..."
+          
+          # systemctl로 서비스 정지
+          sudo systemctl stop llm-outfit-api 2>/dev/null || true
+          
+          # 포트 6020 사용 프로세스 강제 종료
           echo "포트 6020 정리 중..."
-          lsof -ti:6020 | xargs -r kill -TERM 2>/dev/null || true
-          sleep 3
-
-          # systemctl도 이제 안전하게 사용 가능
-          if sudo systemctl is-active --quiet llm-outfit-api; then
-              sudo systemctl stop llm-outfit-api
-              sleep 3
+          sudo lsof -ti:6020 | xargs -r sudo kill -9 2>/dev/null || true
+          
+          # uvicorn 프로세스 강제 종료
+          sudo pkill -9 -f "uvicorn.*main:app" 2>/dev/null || true
+          
+          # 잠시 대기
+          sleep 5
+          
+          # 포트 확인
+          if lsof -ti:6020 >/dev/null 2>&1; then
+            echo "⚠️  경고: 포트 6020이 여전히 사용 중입니다"
+            lsof -i:6020
+          else
+            echo "✅ 포트 6020이 깨끗합니다"
           fi
-          # echo "1단계: 현재 프로세스 목록 확인"
-          # ps aux | grep uvicorn | head -5
-
-          # echo "2단계: 포트 사용 상황 확인"
-          # netstat -tlnp | grep 6020 || echo "포트 6020 사용 안함"
-
-          # echo "3단계: lsof로 정리"
-          # lsof -ti:6020 | head -5 || echo "lsof 결과 없음"
-
-          # echo "4단계: 실제 정리 실행"
-          # lsof -ti:6020 | xargs -r kill -TERM 2>/dev/null || echo "kill 명령어 완료"
-
-          # echo "✅ 모든 단계 완료"
           
           # 서비스 파일 생성
           echo "⚙️ 서비스 파일을 생성합니다..."
@@ -232,16 +389,12 @@ jobs:
           User=ubuntu
           WorkingDirectory=$PROJECT_DIR
           Environment=PATH=$PROJECT_DIR/venv/bin
-          Environment=ENVIRONMENT=production
-          Environment=DEBUG=False
-          Environment=LLM_API_HOST=0.0.0.0
-          Environment=LLM_API_PORT=6020
-          Environment=REDIS_HOST=${{ secrets.REDIS_HOST }}
-          Environment=REDIS_PORT=${{ secrets.REDIS_PORT }}
-          Environment=LOG_LEVEL=INFO
+          EnvironmentFile=$PROJECT_DIR/.env
           ExecStart=$PROJECT_DIR/venv/bin/uvicorn main:app --host 0.0.0.0 --port 6020
           Restart=always
           RestartSec=10
+          StandardOutput=journal
+          StandardError=journal
           
           [Install]
           WantedBy=multi-user.target
@@ -253,9 +406,25 @@ jobs:
           sudo systemctl enable llm-outfit-api
           sudo systemctl start llm-outfit-api
           
-          # 배포 확인
+          # 서비스 시작 대기
+          sleep 10
+          
+          # 서비스 상태 확인
+          echo "🔍 서비스 상태 확인:"
+          sudo systemctl status llm-outfit-api --no-pager
+          
+          # 로그 확인
+          echo "📋 최근 로그:"
+          sudo journalctl -u llm-outfit-api --no-pager -n 20
+          
+          # 포트 확인
+          echo "🌐 포트 6020 상태:"
+          netstat -tlnp | grep 6020 || echo "포트 6020 확인 안됨"
+          
+          # 최종 확인
           echo "✅ 배포가 완료되었습니다!"
           echo "📍 서버 주소: http://${{ secrets.LLM_OUTFIT_EC2_HOST }}:6020"
           
-          # 서비스 상태 확인
-          sudo systemctl status llm-outfit-api --no-pager
+          # Health check 시도
+          echo "🏥 헬스 체크 시도:"
+          curl -f "http://localhost:6020/health" || echo "헬스 체크 실패 (서비스 시작 중일 수 있음)"
