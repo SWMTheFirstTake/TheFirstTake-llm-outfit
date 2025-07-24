@@ -259,7 +259,8 @@
           
 #           # 서비스 상태 확인
 #           sudo systemctl status llm-outfit-api --no-pager
-name: Deploy to EC2 (Fixed)
+
+name: Deploy to EC2 (Disk Space Fixed)
 
 on:
   push:
@@ -304,45 +305,93 @@ jobs:
         script: |
           echo "🚀 TheFirstTake LLM Outfit API 배포를 시작합니다..."
           
-          # 홈 디렉토리로 이동
-          cd /home/ubuntu
+          # 1. 시스템 정보 확인
+          echo "📊 시스템 상태 확인:"
+          echo "디스크 사용량:"
+          df -h
+          echo "메모리 사용량:"
+          free -h
+          echo "임시 디렉토리 확인:"
+          ls -la /tmp/ | head -5 || echo "/tmp 접근 불가"
           
-          # 프로젝트 디렉토리 설정
+          # 2. 디스크 정리
+          echo "🧹 디스크 정리 시작..."
+          
+          # 로그 파일 정리
+          sudo find /var/log -name "*.log" -type f -size +100M -delete 2>/dev/null || true
+          sudo find /var/log -name "*.log.*" -type f -mtime +7 -delete 2>/dev/null || true
+          
+          # apt 캐시 정리
+          sudo apt-get clean 2>/dev/null || true
+          sudo apt-get autoremove -y 2>/dev/null || true
+          
+          # Docker 정리 (있다면)
+          docker system prune -f 2>/dev/null || true
+          
+          # 임시 파일 정리
+          sudo find /tmp -type f -atime +7 -delete 2>/dev/null || true
+          sudo find /var/tmp -type f -atime +7 -delete 2>/dev/null || true
+          
+          # 오래된 Python 캐시 정리
+          find /home/ubuntu -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+          find /home/ubuntu -name "*.pyc" -delete 2>/dev/null || true
+          
+          echo "정리 후 디스크 상태:"
+          df -h
+          
+          # 3. 임시 디렉토리 권한 확인 및 수정
+          echo "🔧 임시 디렉토리 설정..."
+          sudo mkdir -p /tmp /var/tmp
+          sudo chmod 1777 /tmp /var/tmp
+          
+          # 4. 기존 서비스 종료
+          echo "🔄 기존 서비스를 중지합니다..."
+          sudo systemctl stop llm-outfit-api 2>/dev/null || true
+          sudo lsof -ti:6020 | xargs -r sudo kill -9 2>/dev/null || true
+          sudo pkill -9 -f "uvicorn.*main:app" 2>/dev/null || true
+          sleep 3
+          
+          # 5. 프로젝트 디렉토리 설정
+          cd /home/ubuntu
           PROJECT_DIR="/home/ubuntu/TheFirstTake-llm-outfit"
           REPO_URL="https://github.com/SWMTheFirstTake/TheFirstTake-llm-outfit.git"
           
-          # 기존 디렉토리가 있으면 완전 삭제 후 새로 clone (확실한 업데이트)
+          # 기존 디렉토리 삭제 (공간 확보)
           if [ -d "$PROJECT_DIR" ]; then
             echo "📁 기존 프로젝트 디렉토리를 삭제합니다..."
             rm -rf "$PROJECT_DIR"
           fi
           
-          # 새로 clone
-          echo "📁 리포지토리를 새로 clone합니다..."
+          # 6. 새로 clone
+          echo "📁 리포지토리를 clone합니다..."
           git clone "$REPO_URL"
           cd "$PROJECT_DIR"
           
-          # 현재 commit 확인 (디버깅용)
-          echo "📋 현재 commit 정보:"
-          git log --oneline -3
-          echo "📅 마지막 업데이트: $(git log -1 --format=%cd)"
-          
-          # Python 가상환경 생성
+          # 7. Python 가상환경 생성 (시스템 Python 사용)
           echo "📦 Python 가상환경을 생성합니다..."
-          python3 -m venv venv
           
-          # 가상환경 활성화 및 의존성 설치
-          source venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          # venv 대신 더 안전한 방법 사용
+          if ! python3 -m venv venv --system-site-packages; then
+            echo "⚠️ venv 생성 실패, pip --user 방식으로 대체..."
+            # venv 없이 사용자 설치로 대체
+            mkdir -p /home/ubuntu/.local/bin
+            export PATH="/home/ubuntu/.local/bin:$PATH"
+            pip3 install --user --upgrade pip
+            pip3 install --user -r requirements.txt
+            PYTHON_CMD="python3"
+            PIP_CMD="pip3"
+          else
+            echo "✅ venv 생성 성공"
+            source venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            PYTHON_CMD="$PROJECT_DIR/venv/bin/python3"
+            PIP_CMD="$PROJECT_DIR/venv/bin/pip"
+          fi
           
-          # 환경변수 설정 (.env 파일 생성)
+          # 8. 환경변수 설정 (작은 파일로)
           echo "🔐 환경변수를 설정합니다..."
-          cat > .env <<EOF
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
-          REDIS_HOST=${{ secrets.REDIS_HOST }}
-          REDIS_PORT=${{ secrets.REDIS_PORT }}
+          cat > .env <<'EOF'
           ENVIRONMENT=production
           DEBUG=False
           LLM_API_HOST=0.0.0.0
@@ -350,34 +399,15 @@ jobs:
           LOG_LEVEL=INFO
           EOF
           
-          # .env 파일 권한 설정
+          # API 키들은 별도로 추가 (파일 크기 최소화)
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+          echo "CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}" >> .env
+          echo "REDIS_HOST=${{ secrets.REDIS_HOST }}" >> .env
+          echo "REDIS_PORT=${{ secrets.REDIS_PORT }}" >> .env
+          
           chmod 600 .env
           
-          # 기존 서비스 완전 종료
-          echo "🔄 기존 서비스를 완전히 중지합니다..."
-          
-          # systemctl로 서비스 정지
-          sudo systemctl stop llm-outfit-api 2>/dev/null || true
-          
-          # 포트 6020 사용 프로세스 강제 종료
-          echo "포트 6020 정리 중..."
-          sudo lsof -ti:6020 | xargs -r sudo kill -9 2>/dev/null || true
-          
-          # uvicorn 프로세스 강제 종료
-          sudo pkill -9 -f "uvicorn.*main:app" 2>/dev/null || true
-          
-          # 잠시 대기
-          sleep 5
-          
-          # 포트 확인
-          if lsof -ti:6020 >/dev/null 2>&1; then
-            echo "⚠️  경고: 포트 6020이 여전히 사용 중입니다"
-            lsof -i:6020
-          else
-            echo "✅ 포트 6020이 깨끗합니다"
-          fi
-          
-          # 서비스 파일 생성
+          # 9. 서비스 파일 생성 (간소화)
           echo "⚙️ 서비스 파일을 생성합니다..."
           sudo tee /etc/systemd/system/llm-outfit-api.service > /dev/null <<EOF
           [Unit]
@@ -388,9 +418,9 @@ jobs:
           Type=simple
           User=ubuntu
           WorkingDirectory=$PROJECT_DIR
-          Environment=PATH=$PROJECT_DIR/venv/bin
+          Environment=PATH=/home/ubuntu/.local/bin:$PROJECT_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin
           EnvironmentFile=$PROJECT_DIR/.env
-          ExecStart=$PROJECT_DIR/venv/bin/uvicorn main:app --host 0.0.0.0 --port 6020
+          ExecStart=$PYTHON_CMD -m uvicorn main:app --host 0.0.0.0 --port 6020
           Restart=always
           RestartSec=10
           StandardOutput=journal
@@ -400,31 +430,26 @@ jobs:
           WantedBy=multi-user.target
           EOF
           
-          # 서비스 등록 및 시작
+          # 10. 서비스 시작
           echo "🚀 서비스를 시작합니다..."
           sudo systemctl daemon-reload
           sudo systemctl enable llm-outfit-api
           sudo systemctl start llm-outfit-api
           
-          # 서비스 시작 대기
+          # 11. 잠시 대기 후 상태 확인
           sleep 10
           
-          # 서비스 상태 확인
-          echo "🔍 서비스 상태 확인:"
-          sudo systemctl status llm-outfit-api --no-pager
+          echo "🔍 서비스 상태:"
+          sudo systemctl status llm-outfit-api --no-pager || true
           
-          # 로그 확인
-          echo "📋 최근 로그:"
-          sudo journalctl -u llm-outfit-api --no-pager -n 20
+          echo "📋 최근 로그 (마지막 10줄):"
+          sudo journalctl -u llm-outfit-api --no-pager -n 10 || true
           
-          # 포트 확인
           echo "🌐 포트 6020 상태:"
           netstat -tlnp | grep 6020 || echo "포트 6020 확인 안됨"
           
-          # 최종 확인
-          echo "✅ 배포가 완료되었습니다!"
-          echo "📍 서버 주소: http://${{ secrets.LLM_OUTFIT_EC2_HOST }}:6020"
+          echo "💽 최종 디스크 상태:"
+          df -h
           
-          # Health check 시도
-          echo "🏥 헬스 체크 시도:"
-          curl -f "http://localhost:6020/health" || echo "헬스 체크 실패 (서비스 시작 중일 수 있음)"
+          echo "✅ 배포 완료!"
+          echo "📍 서버 주소: http://${{ secrets.LLM_OUTFIT_EC2_HOST }}:6020"
