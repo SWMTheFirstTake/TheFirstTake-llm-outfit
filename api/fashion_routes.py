@@ -58,6 +58,7 @@ def test():
 @router.post("/expert/single")
 async def single_expert_analysis(request: ExpertAnalysisRequest):
     """단일 전문가 분석"""
+    print("test")
     try:
         # Redis에서 기존 프롬프트 히스토리 가져오기
         existing_prompt = redis_service.get_prompt(request.room_id)
