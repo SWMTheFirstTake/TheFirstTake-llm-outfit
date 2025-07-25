@@ -5,6 +5,7 @@ from models.fashion_models import (
     ExpertAnalysisRequest, 
     ExpertChainRequest, 
     PromptRequest,
+    ImageAnalysisRequest,
     FashionExpertType
 )
 from services.fashion_expert_service import SimpleFashionExpertService
@@ -65,7 +66,8 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
         
         # 기존 프롬프트와 새로운 user_input 합치기
         if existing_prompt:
-            combined_input = existing_prompt + "\n" + request.user_input
+            # 새로운 질문을 명확하게 구분하여 추가
+            combined_input = existing_prompt + "\n\n[새로운 질문] " + request.user_input
             logger.info(f"기존 프롬프트와 새로운 입력 합침: room_id={request.room_id}, 기존길이={len(existing_prompt)}, 새길이={len(request.user_input)}")
         else:
             combined_input = request.user_input
@@ -105,7 +107,8 @@ async def expert_chain_analysis(request: ExpertChainRequest):
         
         # 기존 프롬프트와 새로운 user_input 합치기
         if existing_prompt:
-            combined_input = existing_prompt + "\n" + request.user_input
+            # 새로운 질문을 명확하게 구분하여 추가
+            combined_input = existing_prompt + "\n\n[새로운 질문] " + request.user_input
             logger.info(f"기존 프롬프트와 새로운 입력 합침: room_id={request.room_id}, 기존길이={len(existing_prompt)}, 새길이={len(request.user_input)}")
         else:
             combined_input = request.user_input
@@ -197,12 +200,50 @@ async def vision_status():
         }
     )
 
-# ✅ 이미지 분석 API
+# ✅ 이미지 분석 API (S3 링크 기반)
 @router.post("/vision/analyze-outfit")
-async def analyze_outfit(file: UploadFile = File(...)):
-    """이미지 기반 착장 분석 API"""
+async def analyze_outfit(request: ImageAnalysisRequest):
+    """S3 이미지 링크 기반 착장 분석 API"""
     
-    print(f"🔍 analyze_outfit 호출됨")
+    print(f"🔍 analyze_outfit 호출됨 (S3 링크)")
+    print(f"🔍 claude_vision_service 상태: {claude_vision_service is not None}")
+    print(f"🔍 이미지 URL: {request.image_url}")
+    
+    # 서비스 초기화 확인
+    if claude_vision_service is None:
+        print("❌ claude_vision_service가 None입니다!")
+        raise HTTPException(
+            status_code=500, 
+            detail="Claude Vision 서비스가 초기화되지 않았습니다."
+        )
+    
+    try:
+        # S3 이미지 링크 분석
+        result = claude_vision_service.analyze_outfit_from_url(
+            image_url=request.image_url,
+            prompt=request.prompt
+        )
+        print("✅ Claude API 호출 완료")
+        
+        return ResponseModel(
+            success=True,
+            message="이미지 분석이 성공적으로 완료되었습니다",
+            data={"analysis": result}
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ 에러 발생: {str(e)}")
+        logger.error(f"이미지 분석 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"분석 실패: {str(e)}")
+
+# ✅ 이미지 분석 API (파일 업로드 기반 - 기존 방식 유지)
+@router.post("/vision/analyze-outfit-upload")
+async def analyze_outfit_upload(file: UploadFile = File(...)):
+    """파일 업로드 기반 착장 분석 API (기존 방식)"""
+    
+    print(f"🔍 analyze_outfit_upload 호출됨")
     print(f"🔍 claude_vision_service 상태: {claude_vision_service is not None}")
     print(f"🔍 파일명: {file.filename}")
     

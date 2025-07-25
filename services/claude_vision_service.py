@@ -1,5 +1,7 @@
 import anthropic
 import base64
+import requests
+from urllib.parse import urlparse
 
 class ClaudeVisionService:
     def __init__(self, api_key: str):
@@ -12,6 +14,71 @@ class ClaudeVisionService:
         
         self.client = anthropic.Anthropic(api_key=api_key)
         print(f"🔍 ClaudeVisionService 초기화 완료")
+
+    def analyze_outfit_from_url(self, image_url: str, prompt: str = None) -> str:
+        """S3 이미지 링크로부터 착장 분석"""
+        try:
+            print(f"🔍 S3 이미지 링크 분석 시작: {image_url}")
+            
+            # URL 유효성 검증
+            if not self._is_valid_image_url(image_url):
+                raise ValueError("유효하지 않은 이미지 URL입니다.")
+            
+            # 이미지 다운로드
+            image_bytes = self._download_image(image_url)
+            print(f"✅ 이미지 다운로드 완료: {len(image_bytes)} bytes")
+            
+            # 파일명 추출 (확장자 감지용)
+            filename = self._extract_filename_from_url(image_url)
+            
+            # 기존 analyze_outfit 메서드 호출
+            return self.analyze_outfit(image_bytes, filename=filename, prompt=prompt)
+            
+        except Exception as e:
+            print(f"❌ S3 이미지 분석 실패: {str(e)}")
+            raise Exception(f"S3 이미지 분석 실패: {str(e)}")
+
+    def _is_valid_image_url(self, url: str) -> bool:
+        """이미지 URL 유효성 검증"""
+        try:
+            parsed = urlparse(url)
+            # S3 URL 또는 일반적인 이미지 URL 패턴 확인
+            valid_domains = ['s3.amazonaws.com', 's3.', '.amazonaws.com']
+            is_s3_url = any(domain in parsed.netloc for domain in valid_domains)
+            
+            # 파일 확장자 확인
+            valid_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
+            has_valid_extension = any(url.lower().endswith(ext) for ext in valid_extensions)
+            
+            return is_s3_url or has_valid_extension
+        except Exception:
+            return False
+
+    def _download_image(self, url: str) -> bytes:
+        """이미지 다운로드"""
+        try:
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            
+            # Content-Type 확인
+            content_type = response.headers.get('content-type', '')
+            if not content_type.startswith('image/'):
+                raise ValueError(f"이미지 파일이 아닙니다: {content_type}")
+            
+            return response.content
+            
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"이미지 다운로드 실패: {str(e)}")
+
+    def _extract_filename_from_url(self, url: str) -> str:
+        """URL에서 파일명 추출"""
+        try:
+            parsed = urlparse(url)
+            path = parsed.path
+            filename = path.split('/')[-1]
+            return filename if filename else 'image.jpg'
+        except Exception:
+            return 'image.jpg'
 
     def analyze_outfit(self, image_bytes: bytes, filename: str = None, content_type: str = None, prompt: str = None) -> str:
         try:
@@ -40,7 +107,7 @@ class ClaudeVisionService:
                             },
                             {
                                 "type": "text",
-                                "text": prompt or "이 이미지의 착장(색상, 아이템, 스타일, 계절감 등)을 한국어로 상세히 분석해줘."
+                                "text": prompt or "이 이미지의 착장을 간결하게 분석해줘. 주요 아이템명, 색상, 스타일을 한 줄로 요약해줘."
                             }
                         ]
                     }

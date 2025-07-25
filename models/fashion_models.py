@@ -37,4 +37,8 @@ class ExpertChainRequest(BaseModel):
     context_info: Optional[Dict] = None
 
 class PromptRequest(BaseModel):
-    prompt: str 
+    prompt: str
+
+class ImageAnalysisRequest(BaseModel):
+    image_url: str
+    prompt: Optional[str] = None 
