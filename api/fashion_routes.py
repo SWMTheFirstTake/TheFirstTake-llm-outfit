@@ -179,7 +179,7 @@ def find_matching_outfits_from_s3(user_input: str, expert_type: str) -> dict:
                 # 매칭 점수 계산
                 match_score = calculate_match_score(user_input, json_content, expert_type)
                 
-                if match_score > 0.1:  # 임계값을 낮춰서 더 많은 착장 포함
+                if match_score > 0.05:  # 임계값을 더 낮춰서 더 많은 착장 포함
                     matching_outfits.append({
                         'filename': file_info['filename'],
                         'content': json_content,
@@ -194,8 +194,8 @@ def find_matching_outfits_from_s3(user_input: str, expert_type: str) -> dict:
         # 점수순으로 정렬
         matching_outfits.sort(key=lambda x: x['score'], reverse=True)
         
-        # 상위 5개만 반환
-        top_matches = matching_outfits[:5]
+        # 상위 15개까지 반환 (더 많은 선택지)
+        top_matches = matching_outfits[:15]
         
         print(f"✅ S3 매칭 완료: {len(top_matches)}개 착장 발견")
         return {
@@ -315,17 +315,17 @@ def calculate_diversity_bonus(situations: list, extracted_items: dict) -> float:
         return 0.0
 
 def calculate_situation_similarity(user_input: str, situations: list) -> float:
-    """사용자 입력과 상황 태그의 유사성 점수 계산"""
+    """사용자 입력과 상황 태그의 유사성 점수 계산 (더 관대하게)"""
     score = 0.0
     
-    # 상황별 키워드 매핑
+    # 상황별 키워드 매핑 (더 포괄적으로)
     situation_keywords = {
-        "일상": ["일상", "평상시", "데일리", "일반", "보통", "스터디", "공부", "학교", "대학"],
-        "캐주얼": ["캐주얼", "편안", "편한", "자유", "스터디", "공부", "학교", "대학"],
-        "소개팅": ["소개팅", "데이트", "연애", "만남", "미팅"],
-        "면접": ["면접", "비즈니스", "업무", "회사", "직장", "오피스"],
-        "파티": ["파티", "이벤트", "축하", "기념", "특별"],
-        "여행": ["여행", "아웃도어", "야외", "레저", "휴가"]
+        "일상": ["일상", "평상시", "데일리", "일반", "보통", "스터디", "공부", "학교", "대학", "카페", "쇼핑"],
+        "캐주얼": ["캐주얼", "편안", "편한", "자유", "스터디", "공부", "학교", "대학", "친구", "모임"],
+        "소개팅": ["소개팅", "데이트", "연애", "만남", "미팅", "첫만남", "첫 만남"],
+        "면접": ["면접", "비즈니스", "업무", "회사", "직장", "오피스", "회의"],
+        "파티": ["파티", "이벤트", "축하", "기념", "특별", "클럽", "축하연"],
+        "여행": ["여행", "아웃도어", "야외", "레저", "휴가", "액티비티", "운동"]
     }
     
     # 사용자 입력에서 상황 키워드 찾기
@@ -334,10 +334,14 @@ def calculate_situation_similarity(user_input: str, situations: list) -> float:
             if keyword in user_input:
                 # 해당 상황이 JSON의 situations에 있는지 확인
                 if situation in situations:
-                    score += 0.5  # 유사한 상황에 대한 점수를 높임
+                    score += 0.6  # 유사한 상황에 대한 점수를 더 높임
                     break
     
-    return score
+    # 기본 점수: 모든 상황에 대해 작은 점수 부여
+    if situations:
+        score += 0.1  # 기본 보너스
+    
+    return min(score, 0.8)  # 최대 0.8로 제한
 
 @router.get("/health")
 def health_check():
@@ -396,35 +400,58 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
                 print("❌ 매칭할 수 있는 착장이 없어 fallback으로 전환")
                 return await fallback_expert_analysis(request)
         else:
-            # 개선된 로직: 더 다양한 선택을 위한 가중 랜덤 선택
+            # 더욱 개선된 로직: 강제 다양성 보장
             import random
             top_matches = matching_result['matches']
             
-            # 상위 10개까지 확장 (더 많은 선택지)
-            selection_pool = top_matches[:min(10, len(top_matches))]
+            # 상위 20개까지 확장 (더 많은 선택지)
+            selection_pool = top_matches[:min(20, len(top_matches))]
             
             # Redis에서 최근 사용된 아이템들 확인 (같은 세션에서 중복 방지)
-            recent_used = redis_service.get_recent_used_outfits(request.room_id, limit=5)
+            recent_used = redis_service.get_recent_used_outfits(request.room_id, limit=10)
             
             # 최근 사용된 아이템 제외
             available_matches = [match for match in selection_pool 
                                if match['filename'] not in recent_used]
             
-            # 사용 가능한 아이템이 없으면 전체에서 선택
+            # 사용 가능한 아이템이 부족하면 더 넓은 범위에서 선택
+            if len(available_matches) < 3:
+                # 전체 매칭 결과에서 최근 사용되지 않은 것들 찾기
+                all_available = [match for match in matching_result.get('all_files', [])
+                               if match['filename'] not in recent_used]
+                
+                if all_available:
+                    # 랜덤하게 5개 선택하여 풀에 추가
+                    random_additional = random.sample(all_available, min(5, len(all_available)))
+                    available_matches.extend(random_additional)
+            
+            # 여전히 부족하면 전체에서 선택
             if not available_matches:
                 available_matches = selection_pool
             
-            # 가중 랜덤 선택 (점수에 따라 가중치 부여)
-            weights = []
-            for match in available_matches:
-                # 점수가 높을수록 가중치 높음, 하지만 너무 높으면 다양성 감소
-                weight = match['score'] ** 0.7  # 지수 감소로 다양성 증가
-                weights.append(weight)
-            
-            # 가중 랜덤 선택
-            if weights and sum(weights) > 0:
-                selected_match = random.choices(available_matches, weights=weights, k=1)[0]
+            # 강제 다양성: 점수 범위별로 그룹화하여 선택
+            if len(available_matches) >= 5:
+                # 점수별로 그룹화
+                high_score = [m for m in available_matches if m['score'] >= 0.7]
+                mid_score = [m for m in available_matches if 0.4 <= m['score'] < 0.7]
+                low_score = [m for m in available_matches if m['score'] < 0.4]
+                
+                # 각 그룹에서 랜덤 선택 (다양성 보장)
+                candidates = []
+                if high_score:
+                    candidates.append(random.choice(high_score))
+                if mid_score:
+                    candidates.append(random.choice(mid_score))
+                if low_score:
+                    candidates.append(random.choice(low_score))
+                
+                # 후보들 중에서 최종 선택
+                if candidates:
+                    selected_match = random.choice(candidates)
+                else:
+                    selected_match = random.choice(available_matches)
             else:
+                # 후보가 적으면 일반 랜덤 선택
                 selected_match = random.choice(available_matches)
             
             # 선택된 아이템을 최근 사용 목록에 추가
@@ -432,6 +459,7 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
             
             print(f"✅ 선택된 착장: {selected_match['filename']} (점수: {selected_match['score']:.2f})")
             print(f"📊 선택 풀 크기: {len(available_matches)}개, 전체 매칭: {len(top_matches)}개")
+            print(f"🎯 점수 범위: {selected_match['score']:.2f} (다양성 선택)")
         
         # 선택된 착장 정보 추출
         content = selected_match['content']
