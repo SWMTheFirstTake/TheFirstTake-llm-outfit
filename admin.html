@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>패션 분석 관리자 페이지</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .section h2 {
+            color: #555;
+            margin-top: 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .file-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+        .file-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .file-item:hover {
+            background-color: #e9ecef;
+        }
+        .file-item.selected {
+            background-color: #007bff;
+            color: white;
+        }
+        .file-item .filename {
+            font-weight: bold;
+        }
+        .file-item .details {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .content-viewer {
+            border: 1px solid #ddd;
+            padding: 15px;
+            background-color: #f9f9f9;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .image-viewer {
+            border: 1px solid #ddd;
+            padding: 15px;
+            background-color: #f9f9f9;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .image-viewer img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .image-viewer .no-image {
+            color: #666;
+            font-style: italic;
+            padding: 20px;
+        }
+        .situations-editor {
+            margin-top: 15px;
+        }
+        .situation-tag {
+            display: inline-block;
+            background-color: #e9ecef;
+            padding: 5px 10px;
+            margin: 2px;
+            border-radius: 15px;
+            cursor: pointer;
+        }
+        .situation-tag:hover {
+            background-color: #dc3545;
+            color: white;
+        }
+        .situation-input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 5px;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 패션 분석 관리자 페이지</h1>
+        
+        <!-- JSON 파일 목록 섹션 -->
+        <div class="section">
+            <h2>📁 S3 JSON 파일 목록</h2>
+            <button onclick="loadJsonFiles()">파일 목록 새로고침</button>
+            <div id="fileList" class="file-list">
+                <div class="loading">파일 목록을 불러오는 중...</div>
+            </div>
+        </div>
+        
+        <!-- 파일 내용 및 편집 섹션 -->
+        <div class="section">
+            <h2>📝 파일 내용 및 편집</h2>
+            <div id="contentSection" style="display: none;">
+                <h3 id="selectedFileName"></h3>
+                
+                <!-- 이미지 뷰어 -->
+                <div class="image-viewer" id="imageViewer">
+                    <div class="no-image">이미지를 불러오는 중...</div>
+                </div>
+                
+                <div class="content-viewer" id="jsonContent"></div>
+                
+                <div class="situations-editor">
+                    <h4>Situations 태그 편집</h4>
+                    <div id="currentSituations"></div>
+                    <div style="margin-top: 10px;">
+                        <input type="text" id="newSituation" class="situation-input" placeholder="새로운 상황 태그 입력">
+                        <button onclick="addSituation()">추가</button>
+                        <button onclick="updateSituations()">업데이트</button>
+                    </div>
+                </div>
+            </div>
+            <div id="noFileSelected" style="text-align: center; color: #666;">
+                파일을 선택해주세요
+            </div>
+        </div>
+        
+        <!-- 메시지 영역 -->
+        <div id="messageArea"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:6020/api';
+        let currentSituations = [];
+        let selectedFilename = '';
+
+        // 페이지 로드 시 파일 목록 불러오기
+        window.onload = function() {
+            loadJsonFiles();
+        };
+
+        // JSON 파일 목록 불러오기
+        async function loadJsonFiles() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '<div class="loading">파일 목록을 불러오는 중...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/json-files`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayFileList(data.data.json_files);
+                } else {
+                    showError('파일 목록을 불러오는데 실패했습니다: ' + data.message);
+                }
+            } catch (error) {
+                showError('파일 목록을 불러오는데 실패했습니다: ' + error.message);
+            }
+        }
+
+        // 파일 목록 표시
+        function displayFileList(files) {
+            const fileList = document.getElementById('fileList');
+            
+            if (files.length === 0) {
+                fileList.innerHTML = '<div class="loading">JSON 파일이 없습니다.</div>';
+                return;
+            }
+            
+            fileList.innerHTML = files.map(file => `
+                <div class="file-item" onclick="selectFile('${file.filename}')">
+                    <div class="filename">${file.filename}</div>
+                    <div class="details">
+                        크기: ${(file.size / 1024).toFixed(1)}KB | 
+                        수정일: ${new Date(file.last_modified).toLocaleString()}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 파일 선택
+        async function selectFile(filename) {
+            selectedFilename = filename;
+            
+            // 선택된 파일 하이라이트
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.target.closest('.file-item').classList.add('selected');
+            
+            // 파일 내용 불러오기
+            await loadFileContent(filename);
+        }
+
+        // 파일 내용 불러오기
+        async function loadFileContent(filename) {
+            const contentSection = document.getElementById('contentSection');
+            const noFileSelected = document.getElementById('noFileSelected');
+            const selectedFileName = document.getElementById('selectedFileName');
+            const jsonContent = document.getElementById('jsonContent');
+            
+            contentSection.style.display = 'block';
+            noFileSelected.style.display = 'none';
+            selectedFileName.textContent = `파일: ${filename}`;
+            jsonContent.innerHTML = '<div class="loading">파일 내용을 불러오는 중...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/json-content/${filename}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayFileContent(data.data.content);
+                } else {
+                    showError('파일 내용을 불러오는데 실패했습니다: ' + data.message);
+                }
+            } catch (error) {
+                showError('파일 내용을 불러오는데 실패했습니다: ' + error.message);
+            }
+        }
+
+        // 파일 내용 표시
+        function displayFileContent(content) {
+            const jsonContent = document.getElementById('jsonContent');
+            const currentSituationsDiv = document.getElementById('currentSituations');
+            const imageViewer = document.getElementById('imageViewer');
+            
+            // JSON 내용 표시
+            jsonContent.innerHTML = `<pre>${JSON.stringify(content, null, 2)}</pre>`;
+            
+            // 이미지 표시
+            displayImage(content.source_image_url);
+            
+            // 현재 situations 표시
+            currentSituations = content.situations || [];
+            displaySituations();
+        }
+        
+        // 이미지 표시
+        function displayImage(imageUrl) {
+            const imageViewer = document.getElementById('imageViewer');
+            
+            if (imageUrl) {
+                imageViewer.innerHTML = `
+                    <img src="${imageUrl}" alt="패션 이미지" onerror="this.parentElement.innerHTML='<div class=\\'no-image\\'>이미지를 불러올 수 없습니다</div>'">
+                `;
+            } else {
+                // source_image_url이 없는 경우, 파일명으로 이미지 URL 추측
+                // 여러 확장자 시도
+                const extensions = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+                let imageFound = false;
+                
+                for (let ext of extensions) {
+                    const testUrl = `https://thefirsttake-combination.s3.ap-northeast-2.amazonaws.com/image/${selectedFilename}.${ext}`;
+                    
+                    const img = new Image();
+                    img.onload = function() {
+                        if (!imageFound) {
+                            imageFound = true;
+                            imageViewer.innerHTML = `<img src="${testUrl}" alt="패션 이미지" style="max-width: 100%; max-height: 300px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">`;
+                        }
+                    };
+                    img.onerror = function() {
+                        // 마지막 확장자까지 시도했는데 실패한 경우
+                        if (ext === extensions[extensions.length - 1] && !imageFound) {
+                            imageViewer.innerHTML = '<div class="no-image">이미지를 찾을 수 없습니다</div>';
+                        }
+                    };
+                    img.src = testUrl;
+                }
+            }
+        }
+
+        // Situations 표시
+        function displaySituations() {
+            const currentSituationsDiv = document.getElementById('currentSituations');
+            currentSituationsDiv.innerHTML = currentSituations.map(situation => 
+                `<span class="situation-tag" onclick="removeSituation('${situation}')">${situation} ✕</span>`
+            ).join('');
+        }
+
+        // 상황 태그 추가
+        function addSituation() {
+            const input = document.getElementById('newSituation');
+            const newSituation = input.value.trim();
+            
+            if (newSituation && !currentSituations.includes(newSituation)) {
+                currentSituations.push(newSituation);
+                displaySituations();
+                input.value = '';
+            }
+        }
+
+        // 상황 태그 제거
+        function removeSituation(situation) {
+            currentSituations = currentSituations.filter(s => s !== situation);
+            displaySituations();
+        }
+
+        // Situations 업데이트
+        async function updateSituations() {
+            if (!selectedFilename) {
+                showError('파일을 선택해주세요.');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/update-situations/${selectedFilename}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ situations: currentSituations })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess('Situations가 성공적으로 업데이트되었습니다!');
+                    // 파일 내용 새로고침
+                    await loadFileContent(selectedFilename);
+                } else {
+                    showError('업데이트에 실패했습니다: ' + data.message);
+                }
+            } catch (error) {
+                showError('업데이트에 실패했습니다: ' + error.message);
+            }
+        }
+
+        // 에러 메시지 표시
+        function showError(message) {
+            const messageArea = document.getElementById('messageArea');
+            messageArea.innerHTML = `<div class="error">❌ ${message}</div>`;
+            setTimeout(() => {
+                messageArea.innerHTML = '';
+            }, 5000);
+        }
+
+        // 성공 메시지 표시
+        function showSuccess(message) {
+            const messageArea = document.getElementById('messageArea');
+            messageArea.innerHTML = `<div class="success">✅ ${message}</div>`;
+            setTimeout(() => {
+                messageArea.innerHTML = '';
+            }, 3000);
+        }
+
+        // Enter 키로 상황 태그 추가
+        document.getElementById('newSituation').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addSituation();
+            }
+        });
+    </script>
+</body>
+</html> 

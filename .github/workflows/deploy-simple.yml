@@ -185,6 +185,12 @@ jobs:
           CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
           REDIS_HOST=${{ secrets.REDIS_HOST }}
           REDIS_PORT=${{ secrets.REDIS_PORT }}
+          AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
+          AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          S3_COMBINATION_BUCKET_NAME=${{ secrets.S3_COMBINATION_BUCKET_NAME }}
+          S3_COMBINATION_BUCKET_IMAGE_PREFIX=${{ secrets.S3_COMBINATION_BUCKET_IMAGE_PREFIX }}
+          S3_COMBINATION_BUCKET_JSON_PREFIX=${{ secrets.S3_COMBINATION_BUCKET_JSON_PREFIX }}
           ENVIRONMENT=production
           DEBUG=False
           LLM_API_HOST=0.0.0.0
@@ -238,6 +244,12 @@ jobs:
           Environment=LLM_API_PORT=6020
           Environment=REDIS_HOST=${{ secrets.REDIS_HOST }}
           Environment=REDIS_PORT=${{ secrets.REDIS_PORT }}
+          Environment=AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
+          Environment=AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
+          Environment=AWS_REGION=${{ secrets.AWS_REGION }}
+          Environment=S3_COMBINATION_BUCKET_NAME=${{ secrets.S3_COMBINATION_BUCKET_NAME }}
+          Environment=S3_COMBINATION_BUCKET_IMAGE_PREFIX=${{ secrets.S3_COMBINATION_BUCKET_IMAGE_PREFIX }}
+          Environment=S3_COMBINATION_BUCKET_JSON_PREFIX=${{ secrets.S3_COMBINATION_BUCKET_JSON_PREFIX }}
           Environment=LOG_LEVEL=INFO
           ExecStart=$PROJECT_DIR/venv/bin/uvicorn main:app --host 0.0.0.0 --port 6020
           Restart=always

@@ -4,9 +4,10 @@ from dotenv import load_dotenv
 # .env 파일 로드 (로컬 개발용)
 load_dotenv()
 
-# API 키 디버깅
-print(f"🔍 환경변수 CLAUDE_API_KEY: {os.getenv('CLAUDE_API_KEY', 'NOT_SET')}")
-print(f"🔍 환경변수 CLAUDE_API_KEY 길이: {len(os.getenv('CLAUDE_API_KEY', ''))}")
+# API 키 디버깅 (개발 환경에서만)
+if os.getenv("ENVIRONMENT", "development") == "development":
+    print(f"🔍 환경변수 CLAUDE_API_KEY: {'설정됨' if os.getenv('CLAUDE_API_KEY') else 'NOT_SET'}")
+    print(f"🔍 환경변수 CLAUDE_API_KEY 길이: {len(os.getenv('CLAUDE_API_KEY', ''))}")
 
 class Settings:
     """애플리케이션 설정"""
@@ -25,7 +26,6 @@ class Settings:
     # 외부 API 키 (필요시)
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     CLAUDE_API_KEY: str = os.getenv("CLAUDE_API_KEY", "")
-    print(CLAUDE_API_KEY)
 
     # LLM 관련 설정
     # LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "gpt-4o-mini")
@@ -42,6 +42,14 @@ class Settings:
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
     REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
+
+    # AWS S3 설정
+    AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY", "")
+    AWS_SECRET_ACCESS_KEY: str = os.getenv("AWS_SECRET_KEY", "")
+    AWS_REGION: str = os.getenv("AWS_REGION", "ap-northeast-2")
+    S3_COMBINATION_BUCKET_NAME: str = os.getenv("S3_COMBINATION_BUCKET_NAME", "thefirsttake-combination")
+    S3_COMBINATION_BUCKET_IMAGE_PREFIX: str = os.getenv("S3_COMBINATION_BUCKET_IMAGE_PREFIX", "image")
+    S3_COMBINATION_BUCKET_JSON_PREFIX: str = os.getenv("S3_COMBINATION_BUCKET_JSON_PREFIX", "json")
 
     # 프롬프트 관리 설정
     MAX_CONTEXT_LENGTH = 10000  # 최대 컨텍스트 길이
