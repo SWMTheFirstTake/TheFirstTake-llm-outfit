@@ -863,6 +863,23 @@ async def batch_analyze_images():
             try:
                 print(f"🔍 파일 분석 중: {file_info['filename']}")
                 
+                # ContentType 문제가 있는 경우 수정 시도
+                if s3_service:
+                    try:
+                        # S3에서 파일의 ContentType 확인
+                        response = s3_service.s3_client.head_object(
+                            Bucket=s3_service.bucket_name,
+                            Key=file_info['s3_key']
+                        )
+                        content_type = response.get('ContentType', '')
+                        
+                        # ContentType이 잘못된 경우 수정
+                        if content_type == 'binary/octet-stream' or not content_type.startswith('image/'):
+                            print(f"⚠️ ContentType 수정 중: {content_type} -> image/jpeg")
+                            s3_service.fix_image_content_type(file_info['s3_key'])
+                    except Exception as e:
+                        print(f"⚠️ ContentType 확인 실패: {e}")
+                
                 # ImageAnalysisRequest 객체 생성
                 request_data = ImageAnalysisRequest(
                     image_url=file_info['s3_url'],

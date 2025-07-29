@@ -34,13 +34,23 @@ class S3Service:
             if not self.s3_client:
                 raise Exception("S3 클라이언트가 초기화되지 않았습니다.")
             
-            # 파일 확장자 추출
+            # 파일 확장자 추출 및 ContentType 매핑
             if original_filename:
                 file_extension = original_filename.split('.')[-1].lower()
                 if file_extension not in ['jpg', 'jpeg', 'png', 'webp', 'gif']:
                     file_extension = 'jpg'  # 기본값
             else:
                 file_extension = 'jpg'
+            
+            # ContentType 매핑
+            content_type_mapping = {
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'png': 'image/png',
+                'webp': 'image/webp',
+                'gif': 'image/gif'
+            }
+            content_type = content_type_mapping.get(file_extension, 'image/jpeg')
             
             # 타임스탬프 기반 파일명 생성 (마이크로초 포함)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # 마이크로초 3자리만 사용
@@ -51,7 +61,7 @@ class S3Service:
                 Bucket=self.bucket_name,
                 Key=s3_key,
                 Body=image_bytes,
-                ContentType=f'image/{file_extension}'
+                ContentType=content_type
             )
             
             # S3 URL 생성
@@ -286,6 +296,46 @@ class S3Service:
     def get_image_url(self, s3_key: str) -> str:
         """S3 키로부터 이미지 URL 생성"""
         return f"https://{self.bucket_name}.s3.{settings.AWS_REGION}.amazonaws.com/{s3_key}"
+    
+    def fix_image_content_type(self, s3_key: str) -> bool:
+        """이미지 파일의 ContentType을 올바르게 수정"""
+        try:
+            if not self.s3_client:
+                return False
+            
+            # 파일 확장자 추출
+            file_extension = s3_key.split('.')[-1].lower()
+            
+            # ContentType 매핑
+            content_type_mapping = {
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'png': 'image/png',
+                'webp': 'image/webp',
+                'gif': 'image/gif'
+            }
+            content_type = content_type_mapping.get(file_extension, 'image/jpeg')
+            
+            # 기존 객체 복사 (ContentType 변경)
+            copy_source = {
+                'Bucket': self.bucket_name,
+                'Key': s3_key
+            }
+            
+            self.s3_client.copy_object(
+                Bucket=self.bucket_name,
+                CopySource=copy_source,
+                Key=s3_key,
+                MetadataDirective='REPLACE',
+                ContentType=content_type
+            )
+            
+            print(f"✅ ContentType 수정 완료: {s3_key} -> {content_type}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ ContentType 수정 실패: {s3_key} - {e}")
+            return False
 
 # 전역 S3 서비스 인스턴스
 s3_service = None
