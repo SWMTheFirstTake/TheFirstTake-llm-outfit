@@ -408,50 +408,115 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
             selection_pool = top_matches[:min(20, len(top_matches))]
             
             # Redis에서 최근 사용된 아이템들 확인 (같은 세션에서 중복 방지)
-            recent_used = redis_service.get_recent_used_outfits(request.room_id, limit=10)
+            recent_used = redis_service.get_recent_used_outfits(request.room_id, limit=20)
             
-            # 최근 사용된 아이템 제외
+            # 최근 사용된 아이템 제외 (더 강력한 중복 방지)
             available_matches = [match for match in selection_pool 
                                if match['filename'] not in recent_used]
             
-            # 사용 가능한 아이템이 부족하면 더 넓은 범위에서 선택
+            # 사용 가능한 아이템이 부족하면 전체 데이터베이스에서 랜덤 선택
             if len(available_matches) < 3:
-                # 전체 매칭 결과에서 최근 사용되지 않은 것들 찾기
-                all_available = [match for match in matching_result.get('all_files', [])
-                               if match['filename'] not in recent_used]
+                print(f"⚠️ 선택 풀 부족 ({len(available_matches)}개), 전체 DB에서 랜덤 선택")
+                # 전체 JSON 파일에서 최근 사용되지 않은 것들 찾기
+                all_files = matching_result.get('all_files', [])
+                unused_files = [f for f in all_files if f['filename'] not in recent_used]
                 
-                if all_available:
-                    # 랜덤하게 5개 선택하여 풀에 추가
-                    random_additional = random.sample(all_available, min(5, len(all_available)))
-                    available_matches.extend(random_additional)
+                if unused_files:
+                    # 랜덤하게 10개 선택하여 풀에 추가
+                    random_additional = random.sample(unused_files, min(10, len(unused_files)))
+                    for file_info in random_additional:
+                        try:
+                            json_content = s3_service.get_json_content(file_info['filename'])
+                            match_score = calculate_match_score(request.user_input, json_content, request.expert_type.value)
+                            available_matches.append({
+                                'filename': file_info['filename'],
+                                'content': json_content,
+                                'score': match_score,
+                                's3_url': file_info['s3_url']
+                            })
+                        except Exception as e:
+                            continue
             
             # 여전히 부족하면 전체에서 선택
             if not available_matches:
                 available_matches = selection_pool
             
-            # 강제 다양성: 점수 범위별로 그룹화하여 선택
-            if len(available_matches) >= 5:
-                # 점수별로 그룹화
-                high_score = [m for m in available_matches if m['score'] >= 0.7]
-                mid_score = [m for m in available_matches if 0.4 <= m['score'] < 0.7]
-                low_score = [m for m in available_matches if m['score'] < 0.4]
+            # 전문가 타입별 + 강제 다양성 선택 로직
+            if len(available_matches) >= 3:
+                # 전문가 타입별 다른 선택 전략
+                if expert_type == "style_analyst":
+                    # 스타일 분석가: 다양한 스타일링 방법이 있는 것 우선
+                    candidates = []
+                    for match in available_matches:
+                        styling_methods = match['content'].get('extracted_items', {}).get('styling_methods', {})
+                        if isinstance(styling_methods, dict) and len(styling_methods) >= 2:
+                            candidates.append(match)
+                    
+                    if candidates:
+                        selected_match = random.choice(candidates)
+                    else:
+                        selected_match = random.choice(available_matches)
                 
-                # 각 그룹에서 랜덤 선택 (다양성 보장)
-                candidates = []
-                if high_score:
-                    candidates.append(random.choice(high_score))
-                if mid_score:
-                    candidates.append(random.choice(mid_score))
-                if low_score:
-                    candidates.append(random.choice(low_score))
+                elif expert_type == "trend_expert":
+                    # 트렌드 전문가: 최신 스타일 (최근 파일) 우선
+                    recent_matches = sorted(available_matches, 
+                                          key=lambda x: x['filename'], reverse=True)[:5]
+                    selected_match = random.choice(recent_matches)
                 
-                # 후보들 중에서 최종 선택
-                if candidates:
-                    selected_match = random.choice(candidates)
+                elif expert_type == "color_expert":
+                    # 컬러 전문가: 다양한 색상이 있는 것 우선
+                    candidates = []
+                    for match in available_matches:
+                        items = match['content'].get('extracted_items', {})
+                        colors = set()
+                        for category, item_info in items.items():
+                            if isinstance(item_info, dict) and item_info.get('color'):
+                                colors.add(item_info['color'])
+                        if len(colors) >= 2:
+                            candidates.append(match)
+                    
+                    if candidates:
+                        selected_match = random.choice(candidates)
+                    else:
+                        selected_match = random.choice(available_matches)
+                
+                elif expert_type == "fitting_coordinator":
+                    # 핏팅 코디네이터: 다양한 핏 정보가 있는 것 우선
+                    candidates = []
+                    for match in available_matches:
+                        items = match['content'].get('extracted_items', {})
+                        fits = set()
+                        for category, item_info in items.items():
+                            if isinstance(item_info, dict) and item_info.get('fit'):
+                                fits.add(item_info['fit'])
+                        if len(fits) >= 2:
+                            candidates.append(match)
+                    
+                    if candidates:
+                        selected_match = random.choice(candidates)
+                    else:
+                        selected_match = random.choice(available_matches)
+                
                 else:
-                    selected_match = random.choice(available_matches)
+                    # 기본: 점수 범위별 그룹화 선택
+                    high_score = [m for m in available_matches if m['score'] >= 0.7]
+                    mid_score = [m for m in available_matches if 0.4 <= m['score'] < 0.7]
+                    low_score = [m for m in available_matches if m['score'] < 0.4]
+                    
+                    candidates = []
+                    if high_score:
+                        candidates.append(random.choice(high_score))
+                    if mid_score:
+                        candidates.append(random.choice(mid_score))
+                    if low_score:
+                        candidates.append(random.choice(low_score))
+                    
+                    if candidates:
+                        selected_match = random.choice(candidates)
+                    else:
+                        selected_match = random.choice(available_matches)
             else:
-                # 후보가 적으면 일반 랜덤 선택
+                # 후보가 적으면 완전 랜덤 선택
                 selected_match = random.choice(available_matches)
             
             # 선택된 아이템을 최근 사용 목록에 추가
@@ -459,7 +524,16 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
             
             print(f"✅ 선택된 착장: {selected_match['filename']} (점수: {selected_match['score']:.2f})")
             print(f"📊 선택 풀 크기: {len(available_matches)}개, 전체 매칭: {len(top_matches)}개")
-            print(f"🎯 점수 범위: {selected_match['score']:.2f} (다양성 선택)")
+            print(f"🎯 전문가 타입: {expert_type}, 점수: {selected_match['score']:.2f}")
+            
+            # 선택된 아이템의 주요 정보 출력
+            content = selected_match['content']
+            items = content.get('extracted_items', {})
+            situations = content.get('situations', [])
+            
+            print(f"👕 아이템: {items.get('top', {}).get('item', 'N/A')} / {items.get('bottom', {}).get('item', 'N/A')}")
+            print(f"🏷️ 상황: {', '.join(situations[:3])}")
+            print(f"🔄 최근 사용 제외: {len(recent_used)}개")
         
         # 선택된 착장 정보 추출
         content = selected_match['content']
