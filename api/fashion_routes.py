@@ -211,7 +211,7 @@ def find_matching_outfits_from_s3(user_input: str, expert_type: str) -> dict:
         return None
 
 def calculate_match_score(user_input: str, json_content: dict, expert_type: str) -> float:
-    """사용자 입력과 JSON 내용의 매칭 점수 계산"""
+    """사용자 입력과 JSON 내용의 매칭 점수 계산 (다양성 개선)"""
     score = 0.0
     
     try:
@@ -267,10 +267,51 @@ def calculate_match_score(user_input: str, json_content: dict, expert_type: str)
             if styling_methods:
                 score += 0.1
         
+        # 다양성 보너스: 다양한 상황/스타일 조합에 가산점
+        diversity_bonus = calculate_diversity_bonus(situations, extracted_items)
+        score += diversity_bonus
+        
         return min(score, 1.0)  # 최대 1.0으로 제한
         
     except Exception as e:
         print(f"❌ 매칭 점수 계산 실패: {e}")
+        return 0.0
+
+def calculate_diversity_bonus(situations: list, extracted_items: dict) -> float:
+    """다양성 보너스 점수 계산"""
+    bonus = 0.0
+    
+    try:
+        # 상황 다양성 보너스
+        if len(situations) >= 3:
+            bonus += 0.05  # 3개 이상의 상황 태그
+        elif len(situations) >= 2:
+            bonus += 0.03  # 2개의 상황 태그
+        
+        # 아이템 다양성 보너스
+        item_categories = ['top', 'bottom', 'shoes', 'accessories']
+        filled_categories = 0
+        
+        for category in item_categories:
+            if category in extracted_items and extracted_items[category]:
+                item_info = extracted_items[category]
+                if isinstance(item_info, dict) and item_info.get('item'):
+                    filled_categories += 1
+        
+        if filled_categories >= 4:
+            bonus += 0.05  # 4개 카테고리 모두 채워짐
+        elif filled_categories >= 3:
+            bonus += 0.03  # 3개 카테고리 채워짐
+        
+        # 스타일링 방법 다양성 보너스
+        styling_methods = extracted_items.get('styling_methods', {})
+        if isinstance(styling_methods, dict) and len(styling_methods) >= 3:
+            bonus += 0.02  # 3개 이상의 스타일링 방법
+        
+        return bonus
+        
+    except Exception as e:
+        print(f"❌ 다양성 보너스 계산 실패: {e}")
         return 0.0
 
 def calculate_situation_similarity(user_input: str, situations: list) -> float:
@@ -355,17 +396,42 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
                 print("❌ 매칭할 수 있는 착장이 없어 fallback으로 전환")
                 return await fallback_expert_analysis(request)
         else:
-            # 기존 로직: 상위 3개 중에서 랜덤 선택
+            # 개선된 로직: 더 다양한 선택을 위한 가중 랜덤 선택
             import random
             top_matches = matching_result['matches']
             
-            # 상위 3개 중에서 랜덤 선택
-            if len(top_matches) >= 3:
-                selected_match = random.choice(top_matches[:3])
+            # 상위 10개까지 확장 (더 많은 선택지)
+            selection_pool = top_matches[:min(10, len(top_matches))]
+            
+            # Redis에서 최근 사용된 아이템들 확인 (같은 세션에서 중복 방지)
+            recent_used = redis_service.get_recent_used_outfits(request.room_id, limit=5)
+            
+            # 최근 사용된 아이템 제외
+            available_matches = [match for match in selection_pool 
+                               if match['filename'] not in recent_used]
+            
+            # 사용 가능한 아이템이 없으면 전체에서 선택
+            if not available_matches:
+                available_matches = selection_pool
+            
+            # 가중 랜덤 선택 (점수에 따라 가중치 부여)
+            weights = []
+            for match in available_matches:
+                # 점수가 높을수록 가중치 높음, 하지만 너무 높으면 다양성 감소
+                weight = match['score'] ** 0.7  # 지수 감소로 다양성 증가
+                weights.append(weight)
+            
+            # 가중 랜덤 선택
+            if weights and sum(weights) > 0:
+                selected_match = random.choices(available_matches, weights=weights, k=1)[0]
             else:
-                selected_match = random.choice(top_matches)
+                selected_match = random.choice(available_matches)
+            
+            # 선택된 아이템을 최근 사용 목록에 추가
+            redis_service.add_recent_used_outfit(request.room_id, selected_match['filename'])
             
             print(f"✅ 선택된 착장: {selected_match['filename']} (점수: {selected_match['score']:.2f})")
+            print(f"📊 선택 풀 크기: {len(available_matches)}개, 전체 매칭: {len(top_matches)}개")
         
         # 선택된 착장 정보 추출
         content = selected_match['content']

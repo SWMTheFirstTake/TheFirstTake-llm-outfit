@@ -123,6 +123,39 @@
             border-radius: 4px;
             margin-right: 5px;
         }
+        .predefined-tags {
+            margin: 15px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        .predefined-tags h5 {
+            margin: 0 0 10px 0;
+            color: #495057;
+            font-size: 14px;
+        }
+        .predefined-tag {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 6px 12px;
+            margin: 3px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+        .predefined-tag:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+        }
+        .predefined-tag.added {
+            background-color: #28a745;
+        }
+        .predefined-tag.added:hover {
+            background-color: #1e7e34;
+        }
         .loading {
             text-align: center;
             color: #666;
@@ -173,6 +206,15 @@
                 <div class="situations-editor">
                     <h4>Situations 태그 편집</h4>
                     <div id="currentSituations"></div>
+                    
+                    <!-- 미리 정의된 태그들 -->
+                    <div class="predefined-tags">
+                        <h5>🎯 빠른 태그 선택 (클릭하여 추가/제거)</h5>
+                        <div id="predefinedTagsContainer">
+                            <!-- JavaScript로 동적 생성 -->
+                        </div>
+                    </div>
+                    
                     <div style="margin-top: 10px;">
                         <input type="text" id="newSituation" class="situation-input" placeholder="새로운 상황 태그 입력">
                         <button onclick="addSituation()">추가</button>
@@ -193,6 +235,22 @@
         const API_BASE = 'http://localhost:6020/api';
         let currentSituations = [];
         let selectedFilename = '';
+        
+        // 미리 정의된 태그 목록
+        const predefinedTags = [
+            "직장/오피스",
+            "면접",
+            "첫 만남/소개팅",
+            "데이트",
+            "친구 모임",
+            "카페/스터디",
+            "쇼핑/외출",
+            "일상/데일리",
+            "결혼식/축하연",
+            "파티/클럽",
+            "여행",
+            "운동/액티비티"
+        ];
 
         // 페이지 로드 시 파일 목록 불러오기
         window.onload = function() {
@@ -227,7 +285,12 @@
                 return;
             }
             
-            fileList.innerHTML = files.map(file => `
+            // 수정 시간 순으로 정렬 (오래된 것부터 최신 순)
+            const sortedFiles = files.sort((a, b) => {
+                return new Date(a.last_modified) - new Date(b.last_modified);
+            });
+            
+            fileList.innerHTML = sortedFiles.map(file => `
                 <div class="file-item" onclick="selectFile('${file.filename}')">
                     <div class="filename">${file.filename}</div>
                     <div class="details">
@@ -336,6 +399,33 @@
             currentSituationsDiv.innerHTML = currentSituations.map(situation => 
                 `<span class="situation-tag" onclick="removeSituation('${situation}')">${situation} ✕</span>`
             ).join('');
+            
+            // 미리 정의된 태그들 업데이트
+            updatePredefinedTags();
+        }
+        
+        // 미리 정의된 태그들 표시 및 상태 업데이트
+        function updatePredefinedTags() {
+            const container = document.getElementById('predefinedTagsContainer');
+            container.innerHTML = predefinedTags.map(tag => {
+                const isAdded = currentSituations.includes(tag);
+                const className = isAdded ? 'predefined-tag added' : 'predefined-tag';
+                return `<span class="${className}" onclick="togglePredefinedTag('${tag}')">${tag}</span>`;
+            }).join('');
+        }
+        
+        // 미리 정의된 태그 토글 (추가/제거)
+        function togglePredefinedTag(tag) {
+            if (currentSituations.includes(tag)) {
+                // 이미 있으면 제거
+                removeSituation(tag);
+            } else {
+                // 없으면 추가
+                if (!currentSituations.includes(tag)) {
+                    currentSituations.push(tag);
+                    displaySituations();
+                }
+            }
         }
 
         // 상황 태그 추가

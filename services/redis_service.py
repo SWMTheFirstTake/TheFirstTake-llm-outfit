@@ -94,6 +94,45 @@ class RedisService:
         except Exception as e:
             logger.error(f"Redis 프롬프트 설정 실패: {e}")
             return False
+    
+    def get_recent_used_outfits(self, room_id: int, limit: int = 5) -> list:
+        """최근 사용된 아이템 목록 가져오기"""
+        if not self.redis_client:
+            return []
+        
+        try:
+            key = f"{room_id}:recent_outfits"
+            recent_outfits = self.redis_client.lrange(key, 0, limit - 1)
+            return recent_outfits
+        except Exception as e:
+            logger.error(f"최근 사용 아이템 조회 실패: {e}")
+            return []
+    
+    def add_recent_used_outfit(self, room_id: int, filename: str) -> bool:
+        """최근 사용된 아이템 목록에 추가"""
+        if not self.redis_client:
+            return False
+        
+        try:
+            key = f"{room_id}:recent_outfits"
+            
+            # 기존 목록에서 같은 아이템 제거 (중복 방지)
+            self.redis_client.lrem(key, 0, filename)
+            
+            # 새로운 아이템을 맨 앞에 추가
+            self.redis_client.lpush(key, filename)
+            
+            # 최대 10개까지만 유지
+            self.redis_client.ltrim(key, 0, 9)
+            
+            # 1시간 만료
+            self.redis_client.expire(key, 3600)
+            
+            logger.info(f"최근 사용 아이템 추가: {room_id}:{filename}")
+            return True
+        except Exception as e:
+            logger.error(f"최근 사용 아이템 추가 실패: {e}")
+            return False
 
 # 전역 Redis 서비스 인스턴스
 redis_service = RedisService() 
