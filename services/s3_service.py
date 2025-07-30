@@ -9,6 +9,13 @@ class S3Service:
     def __init__(self):
         """S3 서비스 초기화"""
         try:
+            print(f"🔧 S3 서비스 초기화 시작...")
+            print(f"   - AWS_ACCESS_KEY: {'설정됨' if settings.AWS_ACCESS_KEY_ID else 'NOT_SET'}")
+            print(f"   - AWS_SECRET_KEY: {'설정됨' if settings.AWS_SECRET_ACCESS_KEY else 'NOT_SET'}")
+            print(f"   - AWS_REGION: {settings.AWS_REGION}")
+            print(f"   - S3_COMBINATION_BUCKET_NAME: {settings.S3_COMBINATION_BUCKET_NAME}")
+            print(f"   - S3_COMBINATION_BUCKET_JSON_PREFIX: {settings.S3_COMBINATION_BUCKET_JSON_PREFIX}")
+            
             self.s3_client = boto3.client(
                 's3',
                 aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
@@ -19,6 +26,9 @@ class S3Service:
             self.bucket_prefix = settings.S3_COMBINATION_BUCKET_IMAGE_PREFIX
             self.bucket_json_prefix = settings.S3_COMBINATION_BUCKET_JSON_PREFIX
             
+            # 연결 테스트
+            self.s3_client.head_bucket(Bucket=self.bucket_name)
+            
             print(f"✅ S3 서비스 초기화 성공")
             print(f"   - 버킷: {self.bucket_name}")
             print(f"   - 프리픽스: {self.bucket_prefix}")
@@ -26,6 +36,8 @@ class S3Service:
             
         except Exception as e:
             print(f"❌ S3 서비스 초기화 실패: {e}")
+            print(f"   - 에러 타입: {type(e).__name__}")
+            print(f"   - 에러 상세: {str(e)}")
             self.s3_client = None
     
     def upload_image(self, image_bytes: bytes, original_filename: str = None) -> str:
@@ -340,7 +352,14 @@ class S3Service:
 # 전역 S3 서비스 인스턴스
 s3_service = None
 try:
+    print(f"🚀 전역 S3 서비스 초기화 시작...")
     s3_service = S3Service()
+    if s3_service.s3_client:
+        print(f"✅ 전역 S3 서비스 초기화 성공")
+    else:
+        print(f"❌ 전역 S3 서비스 초기화 실패: s3_client가 None")
 except Exception as e:
     print(f"❌ 전역 S3 서비스 초기화 실패: {e}")
+    print(f"   - 에러 타입: {type(e).__name__}")
+    print(f"   - 에러 상세: {str(e)}")
     s3_service = None 

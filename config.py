@@ -8,6 +8,10 @@ load_dotenv()
 if os.getenv("ENVIRONMENT", "development") == "development":
     print(f"🔍 환경변수 CLAUDE_API_KEY: {'설정됨' if os.getenv('CLAUDE_API_KEY') else 'NOT_SET'}")
     print(f"🔍 환경변수 CLAUDE_API_KEY 길이: {len(os.getenv('CLAUDE_API_KEY', ''))}")
+    print(f"🔍 환경변수 AWS_ACCESS_KEY: {'설정됨' if os.getenv('AWS_ACCESS_KEY') else 'NOT_SET'}")
+    print(f"🔍 환경변수 AWS_SECRET_KEY: {'설정됨' if os.getenv('AWS_SECRET_KEY') else 'NOT_SET'}")
+    print(f"🔍 환경변수 AWS_REGION: {os.getenv('AWS_REGION', 'NOT_SET')}")
+    print(f"🔍 환경변수 S3_COMBINATION_BUCKET_NAME: {os.getenv('S3_COMBINATION_BUCKET_NAME', 'NOT_SET')}")
 
 class Settings:
     """애플리케이션 설정"""

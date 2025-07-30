@@ -158,8 +158,14 @@ def save_outfit_analysis_to_json(extracted_items: dict, room_id: str = None) -> 
 def find_matching_outfits_from_s3(user_input: str, expert_type: str) -> dict:
     """S3의 JSON 파일들에서 사용자 입력과 매칭되는 착장 찾기"""
     try:
+        print(f"🔍 S3 매칭 시작: '{user_input}' (전문가: {expert_type})")
+        
         if s3_service is None:
             print("❌ s3_service가 None입니다!")
+            return None
+        
+        if s3_service.s3_client is None:
+            print("❌ s3_service.s3_client가 None입니다!")
             return None
         
         # S3에서 모든 JSON 파일 가져오기
@@ -167,6 +173,8 @@ def find_matching_outfits_from_s3(user_input: str, expert_type: str) -> dict:
         if not json_files:
             print("❌ S3에 JSON 파일이 없습니다!")
             return None
+        
+        print(f"📁 S3에서 {len(json_files)}개 JSON 파일 발견")
         
         matching_outfits = []
         
@@ -197,7 +205,10 @@ def find_matching_outfits_from_s3(user_input: str, expert_type: str) -> dict:
         # 상위 15개까지 반환 (더 많은 선택지)
         top_matches = matching_outfits[:15]
         
-        print(f"✅ S3 매칭 완료: {len(top_matches)}개 착장 발견")
+        print(f"✅ S3 매칭 완료: {len(top_matches)}개 착장 발견 (전체 매칭: {len(matching_outfits)}개)")
+        if top_matches:
+            print(f"   - 최고 점수: {top_matches[0]['filename']} ({top_matches[0]['score']:.3f})")
+        
         return {
             'matches': top_matches,
             'all_files': json_files,  # 모든 파일 정보 추가
@@ -366,11 +377,19 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
     
     try:
         # S3에서 매칭되는 착장 찾기
+        print(f"🔍 S3 매칭 시도: '{request.user_input}' (전문가: {request.expert_type.value})")
         matching_result = find_matching_outfits_from_s3(request.user_input, request.expert_type.value)
         
         if not matching_result:
             # S3 연결 실패 등의 경우 기존 방식 사용
-            print("ℹ️ S3 연결 실패로 기존 방식 사용")
+            print("❌ S3 매칭 실패로 fallback 로직 사용")
+            print(f"   - s3_service 상태: {s3_service is not None}")
+            if s3_service:
+                print(f"   - s3_client 상태: {s3_service.s3_client is not None}")
+                print(f"   - bucket_name: {s3_service.bucket_name}")
+                print(f"   - bucket_json_prefix: {s3_service.bucket_json_prefix}")
+            else:
+                print("   - s3_service가 None입니다!")
             return await fallback_expert_analysis(request)
         
         if not matching_result['matches']:
@@ -400,6 +419,7 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
                 print("❌ 매칭할 수 있는 착장이 없어 fallback으로 전환")
                 return await fallback_expert_analysis(request)
         else:
+            print(f"✅ S3 매칭 성공: {len(matching_result['matches'])}개 착장 발견")
             # 더욱 개선된 로직: 강제 다양성 보장
             import random
             top_matches = matching_result['matches']
@@ -410,9 +430,21 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
             # Redis에서 최근 사용된 아이템들 확인 (같은 세션에서 중복 방지)
             recent_used = redis_service.get_recent_used_outfits(request.room_id, limit=20)
             
+            # Redis 연결 실패 시에도 기본 중복 방지를 위한 로컬 캐시 사용
+            if not recent_used:
+                print("⚠️ Redis 연결 실패 또는 최근 사용 데이터 없음, 로컬 중복 방지 사용")
+                # 최소한의 중복 방지를 위해 빈 리스트로 시작
+                recent_used = []
+            
+            print(f"🔄 Redis에서 가져온 최근 사용 아이템: {len(recent_used)}개")
+            if recent_used:
+                print(f"   - 최근 사용된 파일들: {recent_used[:5]}...")
+            
             # 최근 사용된 아이템 제외 (더 강력한 중복 방지)
             available_matches = [match for match in selection_pool 
                                if match['filename'] not in recent_used]
+            
+            print(f"🔄 중복 제거 후 사용 가능한 아이템: {len(available_matches)}개 (전체: {len(selection_pool)}개)")
             
             # 사용 가능한 아이템이 부족하면 전체 데이터베이스에서 랜덤 선택
             if len(available_matches) < 3:
@@ -437,14 +469,30 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
                         except Exception as e:
                             continue
             
-            # 여전히 부족하면 전체에서 선택
+            # 여전히 부족하면 전체에서 선택하되, 최근 사용된 것들은 가중치를 낮춤
             if not available_matches:
+                print("⚠️ 사용 가능한 아이템이 없어 전체에서 선택하되 가중치 조정")
                 available_matches = selection_pool
+                # 최근 사용된 아이템들은 선택 확률을 낮춤
+                for match in available_matches:
+                    if match['filename'] in recent_used:
+                        match['score'] *= 0.3  # 점수를 30%로 낮춤 (더 강력한 중복 방지)
             
             # 전문가 타입별 + 강제 다양성 선택 로직
             if len(available_matches) >= 3:
+                # 가중치 기반 선택을 위한 점수 정규화
+                total_score = sum(match['score'] for match in available_matches)
+                if total_score > 0:
+                    for match in available_matches:
+                        match['weight'] = match['score'] / total_score
+                else:
+                    # 모든 점수가 0인 경우 균등 가중치
+                    weight = 1.0 / len(available_matches)
+                    for match in available_matches:
+                        match['weight'] = weight
+                
                 # 전문가 타입별 다른 선택 전략
-                if expert_type == "style_analyst":
+                if request.expert_type.value == "style_analyst":
                     # 스타일 분석가: 다양한 스타일링 방법이 있는 것 우선
                     candidates = []
                     for match in available_matches:
@@ -453,17 +501,22 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
                             candidates.append(match)
                     
                     if candidates:
-                        selected_match = random.choice(candidates)
+                        # 가중치 기반 선택
+                        weights = [c['weight'] for c in candidates]
+                        selected_match = random.choices(candidates, weights=weights, k=1)[0]
                     else:
-                        selected_match = random.choice(available_matches)
+                        # 가중치 기반 선택
+                        weights = [m['weight'] for m in available_matches]
+                        selected_match = random.choices(available_matches, weights=weights, k=1)[0]
                 
-                elif expert_type == "trend_expert":
+                elif request.expert_type.value == "trend_expert":
                     # 트렌드 전문가: 최신 스타일 (최근 파일) 우선
                     recent_matches = sorted(available_matches, 
                                           key=lambda x: x['filename'], reverse=True)[:5]
-                    selected_match = random.choice(recent_matches)
+                    weights = [m['weight'] for m in recent_matches]
+                    selected_match = random.choices(recent_matches, weights=weights, k=1)[0]
                 
-                elif expert_type == "color_expert":
+                elif request.expert_type.value == "color_expert":
                     # 컬러 전문가: 다양한 색상이 있는 것 우선
                     candidates = []
                     for match in available_matches:
@@ -476,11 +529,15 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
                             candidates.append(match)
                     
                     if candidates:
-                        selected_match = random.choice(candidates)
+                        # 가중치 기반 선택
+                        weights = [c['weight'] for c in candidates]
+                        selected_match = random.choices(candidates, weights=weights, k=1)[0]
                     else:
-                        selected_match = random.choice(available_matches)
+                        # 가중치 기반 선택
+                        weights = [m['weight'] for m in available_matches]
+                        selected_match = random.choices(available_matches, weights=weights, k=1)[0]
                 
-                elif expert_type == "fitting_coordinator":
+                elif request.expert_type.value == "fitting_coordinator":
                     # 핏팅 코디네이터: 다양한 핏 정보가 있는 것 우선
                     candidates = []
                     for match in available_matches:
@@ -493,38 +550,34 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
                             candidates.append(match)
                     
                     if candidates:
-                        selected_match = random.choice(candidates)
+                        # 가중치 기반 선택
+                        weights = [c['weight'] for c in candidates]
+                        selected_match = random.choices(candidates, weights=weights, k=1)[0]
                     else:
-                        selected_match = random.choice(available_matches)
+                        # 가중치 기반 선택
+                        weights = [m['weight'] for m in available_matches]
+                        selected_match = random.choices(available_matches, weights=weights, k=1)[0]
                 
                 else:
-                    # 기본: 점수 범위별 그룹화 선택
-                    high_score = [m for m in available_matches if m['score'] >= 0.7]
-                    mid_score = [m for m in available_matches if 0.4 <= m['score'] < 0.7]
-                    low_score = [m for m in available_matches if m['score'] < 0.4]
-                    
-                    candidates = []
-                    if high_score:
-                        candidates.append(random.choice(high_score))
-                    if mid_score:
-                        candidates.append(random.choice(mid_score))
-                    if low_score:
-                        candidates.append(random.choice(low_score))
-                    
-                    if candidates:
-                        selected_match = random.choice(candidates)
-                    else:
-                        selected_match = random.choice(available_matches)
+                    # 기본: 가중치 기반 선택
+                    weights = [m['weight'] for m in available_matches]
+                    selected_match = random.choices(available_matches, weights=weights, k=1)[0]
             else:
-                # 후보가 적으면 완전 랜덤 선택
-                selected_match = random.choice(available_matches)
+                # 후보가 적으면 가중치 기반 선택
+                weights = [m.get('weight', 1.0) for m in available_matches]
+                selected_match = random.choices(available_matches, weights=weights, k=1)[0]
             
             # 선택된 아이템을 최근 사용 목록에 추가
             redis_service.add_recent_used_outfit(request.room_id, selected_match['filename'])
             
             print(f"✅ 선택된 착장: {selected_match['filename']} (점수: {selected_match['score']:.2f})")
             print(f"📊 선택 풀 크기: {len(available_matches)}개, 전체 매칭: {len(top_matches)}개")
-            print(f"🎯 전문가 타입: {expert_type}, 점수: {selected_match['score']:.2f}")
+            print(f"🎯 전문가 타입: {request.expert_type.value}, 점수: {selected_match['score']:.2f}")
+            print(f"🔄 최근 사용 제외: {len(recent_used)}개")
+            
+            # 가중치 정보 출력
+            if 'weight' in selected_match:
+                print(f"⚖️ 선택 가중치: {selected_match['weight']:.3f}")
             
             # 선택된 아이템의 주요 정보 출력
             content = selected_match['content']
@@ -534,6 +587,11 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
             print(f"👕 아이템: {items.get('top', {}).get('item', 'N/A')} / {items.get('bottom', {}).get('item', 'N/A')}")
             print(f"🏷️ 상황: {', '.join(situations[:3])}")
             print(f"🔄 최근 사용 제외: {len(recent_used)}개")
+            
+            # 중복 방지 강화: 선택된 아이템을 즉시 로컬 캐시에도 추가
+            recent_used.append(selected_match['filename'])
+            if len(recent_used) > 20:
+                recent_used.pop(0)  # 가장 오래된 것 제거
         
         # 선택된 착장 정보 추출
         content = selected_match['content']

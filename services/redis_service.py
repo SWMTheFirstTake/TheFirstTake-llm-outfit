@@ -98,11 +98,13 @@ class RedisService:
     def get_recent_used_outfits(self, room_id: int, limit: int = 5) -> list:
         """최근 사용된 아이템 목록 가져오기"""
         if not self.redis_client:
+            logger.warning("Redis 클라이언트가 연결되지 않았습니다")
             return []
         
         try:
             key = f"{room_id}:recent_outfits"
             recent_outfits = self.redis_client.lrange(key, 0, limit - 1)
+            logger.info(f"Redis에서 최근 사용 아이템 조회: {key} = {len(recent_outfits)}개")
             return recent_outfits
         except Exception as e:
             logger.error(f"최근 사용 아이템 조회 실패: {e}")
@@ -111,22 +113,25 @@ class RedisService:
     def add_recent_used_outfit(self, room_id: int, filename: str) -> bool:
         """최근 사용된 아이템 목록에 추가"""
         if not self.redis_client:
+            logger.warning("Redis 클라이언트가 연결되지 않았습니다")
             return False
         
         try:
             key = f"{room_id}:recent_outfits"
             
             # 기존 목록에서 같은 아이템 제거 (중복 방지)
-            self.redis_client.lrem(key, 0, filename)
+            removed_count = self.redis_client.lrem(key, 0, filename)
+            if removed_count > 0:
+                logger.info(f"기존 중복 아이템 제거: {filename} ({removed_count}개)")
             
             # 새로운 아이템을 맨 앞에 추가
             self.redis_client.lpush(key, filename)
             
-            # 최대 10개까지만 유지
-            self.redis_client.ltrim(key, 0, 9)
+            # 최대 20개까지만 유지 (더 많은 중복 방지)
+            self.redis_client.ltrim(key, 0, 19)
             
-            # 1시간 만료
-            self.redis_client.expire(key, 3600)
+            # 2시간 만료 (더 긴 시간 동안 중복 방지)
+            self.redis_client.expire(key, 7200)
             
             logger.info(f"최근 사용 아이템 추가: {room_id}:{filename}")
             return True
