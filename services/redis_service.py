@@ -127,11 +127,11 @@ class RedisService:
             # 새로운 아이템을 맨 앞에 추가
             self.redis_client.lpush(key, filename)
             
-            # 최대 20개까지만 유지 (더 많은 중복 방지)
-            self.redis_client.ltrim(key, 0, 19)
+            # 최대 30개까지만 유지 (더 많은 중복 방지)
+            self.redis_client.ltrim(key, 0, 29)
             
-            # 2시간 만료 (더 긴 시간 동안 중복 방지)
-            self.redis_client.expire(key, 7200)
+            # 4시간 만료 (더 긴 시간 동안 중복 방지)
+            self.redis_client.expire(key, 14400)
             
             logger.info(f"최근 사용 아이템 추가: {room_id}:{filename}")
             return True

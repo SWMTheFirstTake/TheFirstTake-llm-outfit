@@ -476,122 +476,140 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
                 # 최근 사용된 아이템들은 선택 확률을 낮춤
                 for match in available_matches:
                     if match['filename'] in recent_used:
-                        match['score'] *= 0.3  # 점수를 30%로 낮춤 (더 강력한 중복 방지)
+                        match['score'] *= 0.1  # 점수를 10%로 낮춤 (더 강력한 중복 방지)
             
-            # 전문가 타입별 + 강제 다양성 선택 로직
-            if len(available_matches) >= 3:
-                # 가중치 기반 선택을 위한 점수 정규화
-                total_score = sum(match['score'] for match in available_matches)
-                if total_score > 0:
-                    for match in available_matches:
-                        match['weight'] = match['score'] / total_score
+            # 강제 다양성: 같은 파일이 연속으로 선택되지 않도록
+            if len(available_matches) > 1:
+                # 최근 5개 요청에서 사용된 파일들을 더 강력하게 제외
+                recent_5_used = recent_used[:5]
+                if recent_5_used:
+                    available_matches = [match for match in available_matches 
+                                       if match['filename'] not in recent_5_used]
+                    print(f"🔄 최근 5개 사용 파일 제외 후: {len(available_matches)}개")
+                    
+                    # 여전히 부족하면 가중치만 낮춤
+                    if len(available_matches) < 2:
+                        available_matches = [match for match in selection_pool]
+                        for match in available_matches:
+                            if match['filename'] in recent_5_used:
+                                match['score'] *= 0.05  # 점수를 5%로 낮춤
+                
+                # 전문가 타입별 + 강제 다양성 선택 로직
+                if len(available_matches) >= 3:
+                    # 가중치 기반 선택을 위한 점수 정규화
+                    total_score = sum(match['score'] for match in available_matches)
+                    if total_score > 0:
+                        for match in available_matches:
+                            match['weight'] = match['score'] / total_score
+                    else:
+                        # 모든 점수가 0인 경우 균등 가중치
+                        weight = 1.0 / len(available_matches)
+                        for match in available_matches:
+                            match['weight'] = weight
+                    
+                    # 전문가 타입별 다른 선택 전략
+                    if request.expert_type.value == "style_analyst":
+                        # 스타일 분석가: 다양한 스타일링 방법이 있는 것 우선
+                        candidates = []
+                        for match in available_matches:
+                            styling_methods = match['content'].get('extracted_items', {}).get('styling_methods', {})
+                            if isinstance(styling_methods, dict) and len(styling_methods) >= 2:
+                                candidates.append(match)
+                        
+                        if candidates:
+                            # 가중치 기반 선택
+                            weights = [c['weight'] for c in candidates]
+                            selected_match = random.choices(candidates, weights=weights, k=1)[0]
+                        else:
+                            # 가중치 기반 선택
+                            weights = [m['weight'] for m in available_matches]
+                            selected_match = random.choices(available_matches, weights=weights, k=1)[0]
+                    
+                    elif request.expert_type.value == "trend_expert":
+                        # 트렌드 전문가: 최신 스타일 (최근 파일) 우선
+                        recent_matches = sorted(available_matches, 
+                                              key=lambda x: x['filename'], reverse=True)[:5]
+                        weights = [m['weight'] for m in recent_matches]
+                        selected_match = random.choices(recent_matches, weights=weights, k=1)[0]
+                    
+                    elif request.expert_type.value == "color_expert":
+                        # 컬러 전문가: 다양한 색상이 있는 것 우선
+                        candidates = []
+                        for match in available_matches:
+                            items = match['content'].get('extracted_items', {})
+                            colors = set()
+                            for category, item_info in items.items():
+                                if isinstance(item_info, dict) and item_info.get('color'):
+                                    colors.add(item_info['color'])
+                            if len(colors) >= 2:
+                                candidates.append(match)
+                        
+                        if candidates:
+                            # 가중치 기반 선택
+                            weights = [c['weight'] for c in candidates]
+                            selected_match = random.choices(candidates, weights=weights, k=1)[0]
+                        else:
+                            # 가중치 기반 선택
+                            weights = [m['weight'] for m in available_matches]
+                            selected_match = random.choices(available_matches, weights=weights, k=1)[0]
+                    
+                    elif request.expert_type.value == "fitting_coordinator":
+                        # 핏팅 코디네이터: 다양한 핏 정보가 있는 것 우선
+                        candidates = []
+                        for match in available_matches:
+                            items = match['content'].get('extracted_items', {})
+                            fits = set()
+                            for category, item_info in items.items():
+                                if isinstance(item_info, dict) and item_info.get('fit'):
+                                    fits.add(item_info['fit'])
+                            if len(fits) >= 2:
+                                candidates.append(match)
+                        
+                        if candidates:
+                            # 가중치 기반 선택
+                            weights = [c['weight'] for c in candidates]
+                            selected_match = random.choices(candidates, weights=weights, k=1)[0]
+                        else:
+                            # 가중치 기반 선택
+                            weights = [m['weight'] for m in available_matches]
+                            selected_match = random.choices(available_matches, weights=weights, k=1)[0]
+                    
+                    else:
+                        # 기본: 가중치 기반 선택
+                        weights = [m['weight'] for m in available_matches]
+                        selected_match = random.choices(available_matches, weights=weights, k=1)[0]
                 else:
-                    # 모든 점수가 0인 경우 균등 가중치
-                    weight = 1.0 / len(available_matches)
-                    for match in available_matches:
-                        match['weight'] = weight
-                
-                # 전문가 타입별 다른 선택 전략
-                if request.expert_type.value == "style_analyst":
-                    # 스타일 분석가: 다양한 스타일링 방법이 있는 것 우선
-                    candidates = []
-                    for match in available_matches:
-                        styling_methods = match['content'].get('extracted_items', {}).get('styling_methods', {})
-                        if isinstance(styling_methods, dict) and len(styling_methods) >= 2:
-                            candidates.append(match)
-                    
-                    if candidates:
-                        # 가중치 기반 선택
-                        weights = [c['weight'] for c in candidates]
-                        selected_match = random.choices(candidates, weights=weights, k=1)[0]
-                    else:
-                        # 가중치 기반 선택
-                        weights = [m['weight'] for m in available_matches]
-                        selected_match = random.choices(available_matches, weights=weights, k=1)[0]
-                
-                elif request.expert_type.value == "trend_expert":
-                    # 트렌드 전문가: 최신 스타일 (최근 파일) 우선
-                    recent_matches = sorted(available_matches, 
-                                          key=lambda x: x['filename'], reverse=True)[:5]
-                    weights = [m['weight'] for m in recent_matches]
-                    selected_match = random.choices(recent_matches, weights=weights, k=1)[0]
-                
-                elif request.expert_type.value == "color_expert":
-                    # 컬러 전문가: 다양한 색상이 있는 것 우선
-                    candidates = []
-                    for match in available_matches:
-                        items = match['content'].get('extracted_items', {})
-                        colors = set()
-                        for category, item_info in items.items():
-                            if isinstance(item_info, dict) and item_info.get('color'):
-                                colors.add(item_info['color'])
-                        if len(colors) >= 2:
-                            candidates.append(match)
-                    
-                    if candidates:
-                        # 가중치 기반 선택
-                        weights = [c['weight'] for c in candidates]
-                        selected_match = random.choices(candidates, weights=weights, k=1)[0]
-                    else:
-                        # 가중치 기반 선택
-                        weights = [m['weight'] for m in available_matches]
-                        selected_match = random.choices(available_matches, weights=weights, k=1)[0]
-                
-                elif request.expert_type.value == "fitting_coordinator":
-                    # 핏팅 코디네이터: 다양한 핏 정보가 있는 것 우선
-                    candidates = []
-                    for match in available_matches:
-                        items = match['content'].get('extracted_items', {})
-                        fits = set()
-                        for category, item_info in items.items():
-                            if isinstance(item_info, dict) and item_info.get('fit'):
-                                fits.add(item_info['fit'])
-                        if len(fits) >= 2:
-                            candidates.append(match)
-                    
-                    if candidates:
-                        # 가중치 기반 선택
-                        weights = [c['weight'] for c in candidates]
-                        selected_match = random.choices(candidates, weights=weights, k=1)[0]
-                    else:
-                        # 가중치 기반 선택
-                        weights = [m['weight'] for m in available_matches]
-                        selected_match = random.choices(available_matches, weights=weights, k=1)[0]
-                
-                else:
-                    # 기본: 가중치 기반 선택
-                    weights = [m['weight'] for m in available_matches]
+                    # 후보가 적으면 가중치 기반 선택
+                    weights = [m.get('weight', 1.0) for m in available_matches]
                     selected_match = random.choices(available_matches, weights=weights, k=1)[0]
-            else:
-                # 후보가 적으면 가중치 기반 선택
-                weights = [m.get('weight', 1.0) for m in available_matches]
-                selected_match = random.choices(available_matches, weights=weights, k=1)[0]
+                
+                # 선택된 아이템을 최근 사용 목록에 추가
+                redis_service.add_recent_used_outfit(request.room_id, selected_match['filename'])
+                
+                print(f"✅ 선택된 착장: {selected_match['filename']} (점수: {selected_match['score']:.2f})")
+                print(f"📊 선택 풀 크기: {len(available_matches)}개, 전체 매칭: {len(top_matches)}개")
+                print(f"🎯 전문가 타입: {request.expert_type.value}, 점수: {selected_match['score']:.2f}")
+                print(f"🔄 최근 사용 제외: {len(recent_used)}개")
+                
+                # 가중치 정보 출력
+                if 'weight' in selected_match:
+                    print(f"⚖️ 선택 가중치: {selected_match['weight']:.3f}")
+                
+                # 선택된 아이템의 주요 정보 출력
+                content = selected_match['content']
+                items = content.get('extracted_items', {})
+                situations = content.get('situations', [])
+                
+                print(f"👕 아이템: {items.get('top', {}).get('item', 'N/A')} / {items.get('bottom', {}).get('item', 'N/A')}")
+                print(f"🏷️ 상황: {', '.join(situations[:3])}")
+                print(f"🔄 최근 사용 제외: {len(recent_used)}개")
+                
+                # 중복 방지 강화: 선택된 아이템을 즉시 로컬 캐시에도 추가
+                recent_used.append(selected_match['filename'])
+                if len(recent_used) > 20:
+                    recent_used.pop(0)  # 가장 오래된 것 제거
             
-            # 선택된 아이템을 최근 사용 목록에 추가
-            redis_service.add_recent_used_outfit(request.room_id, selected_match['filename'])
-            
-            print(f"✅ 선택된 착장: {selected_match['filename']} (점수: {selected_match['score']:.2f})")
-            print(f"📊 선택 풀 크기: {len(available_matches)}개, 전체 매칭: {len(top_matches)}개")
-            print(f"🎯 전문가 타입: {request.expert_type.value}, 점수: {selected_match['score']:.2f}")
-            print(f"🔄 최근 사용 제외: {len(recent_used)}개")
-            
-            # 가중치 정보 출력
-            if 'weight' in selected_match:
-                print(f"⚖️ 선택 가중치: {selected_match['weight']:.3f}")
-            
-            # 선택된 아이템의 주요 정보 출력
-            content = selected_match['content']
-            items = content.get('extracted_items', {})
-            situations = content.get('situations', [])
-            
-            print(f"👕 아이템: {items.get('top', {}).get('item', 'N/A')} / {items.get('bottom', {}).get('item', 'N/A')}")
-            print(f"🏷️ 상황: {', '.join(situations[:3])}")
-            print(f"🔄 최근 사용 제외: {len(recent_used)}개")
-            
-            # 중복 방지 강화: 선택된 아이템을 즉시 로컬 캐시에도 추가
-            recent_used.append(selected_match['filename'])
-            if len(recent_used) > 20:
-                recent_used.pop(0)  # 가장 오래된 것 제거
+            print(f"✅ 선택된 아이템을 Redis와 로컬 캐시에 추가: {selected_match['filename']}")
         
         # 선택된 착장 정보 추출
         content = selected_match['content']
