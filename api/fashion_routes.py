@@ -507,81 +507,121 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
                         for match in available_matches:
                             match['weight'] = weight
                     
-                    # 전문가 타입별 다른 선택 전략
+                    # 점수대별 그룹화
+                    high_score = [m for m in available_matches if m['score'] >= 0.6]
+                    mid_score = [m for m in available_matches if 0.3 <= m['score'] < 0.6]
+                    low_score = [m for m in available_matches if m['score'] < 0.3]
+                    
+                    print(f"📊 점수대별 분포: 고득점({len(high_score)}개), 중간({len(mid_score)}개), 저득점({len(low_score)}개)")
+                    
+                    # 점수대별 선택 확률 (고득점 40%, 중간 40%, 저득점 20%)
+                    import random
+                    score_choice = random.choices(
+                        ['high', 'mid', 'low'], 
+                        weights=[0.4, 0.4, 0.2], 
+                        k=1
+                    )[0]
+                    
+                    print(f"🎲 선택된 점수대: {score_choice}")
+                    
+                    # 선택된 점수대에서 후보 선택
+                    if score_choice == 'high' and high_score:
+                        candidates = high_score
+                        print(f"✅ 고득점 그룹에서 선택 (점수: 0.6+)")
+                    elif score_choice == 'mid' and mid_score:
+                        candidates = mid_score
+                        print(f"✅ 중간 점수 그룹에서 선택 (점수: 0.3-0.6)")
+                    elif score_choice == 'low' and low_score:
+                        candidates = low_score
+                        print(f"✅ 저득점 그룹에서 선택 (점수: 0.3 미만)")
+                    else:
+                        # 선택된 점수대에 후보가 없으면 다른 점수대에서 선택
+                        if high_score:
+                            candidates = high_score
+                            print(f"⚠️ 고득점 그룹으로 대체 선택")
+                        elif mid_score:
+                            candidates = mid_score
+                            print(f"⚠️ 중간 점수 그룹으로 대체 선택")
+                        elif low_score:
+                            candidates = low_score
+                            print(f"⚠️ 저득점 그룹으로 대체 선택")
+                        else:
+                            candidates = available_matches
+                            print(f"⚠️ 전체에서 선택")
+                    
+                    # 전문가 타입별 필터링
                     if request.expert_type.value == "style_analyst":
                         # 스타일 분석가: 다양한 스타일링 방법이 있는 것 우선
-                        candidates = []
-                        for match in available_matches:
+                        filtered_candidates = []
+                        for match in candidates:
                             styling_methods = match['content'].get('extracted_items', {}).get('styling_methods', {})
                             if isinstance(styling_methods, dict) and len(styling_methods) >= 2:
-                                candidates.append(match)
+                                filtered_candidates.append(match)
                         
-                        if candidates:
-                            # 가중치 기반 선택
-                            weights = [c['weight'] for c in candidates]
-                            selected_match = random.choices(candidates, weights=weights, k=1)[0]
+                        if filtered_candidates:
+                            candidates = filtered_candidates
+                            print(f"🎯 스타일 분석가 필터 적용: {len(candidates)}개 후보")
                         else:
-                            # 가중치 기반 선택
-                            weights = [m['weight'] for m in available_matches]
-                            selected_match = random.choices(available_matches, weights=weights, k=1)[0]
+                            print(f"⚠️ 스타일 분석가 필터 적용 불가, 전체 후보 사용")
                     
                     elif request.expert_type.value == "trend_expert":
                         # 트렌드 전문가: 최신 스타일 (최근 파일) 우선
-                        recent_matches = sorted(available_matches, 
-                                              key=lambda x: x['filename'], reverse=True)[:5]
-                        weights = [m['weight'] for m in recent_matches]
-                        selected_match = random.choices(recent_matches, weights=weights, k=1)[0]
+                        recent_candidates = sorted(candidates, 
+                                             key=lambda x: x['filename'], reverse=True)[:5]
+                        if recent_candidates:
+                            candidates = recent_candidates
+                            print(f"🎯 트렌드 전문가 필터 적용: 최근 5개 파일")
+                        else:
+                            print(f"⚠️ 트렌드 전문가 필터 적용 불가, 전체 후보 사용")
                     
                     elif request.expert_type.value == "color_expert":
                         # 컬러 전문가: 다양한 색상이 있는 것 우선
-                        candidates = []
-                        for match in available_matches:
+                        filtered_candidates = []
+                        for match in candidates:
                             items = match['content'].get('extracted_items', {})
                             colors = set()
                             for category, item_info in items.items():
                                 if isinstance(item_info, dict) and item_info.get('color'):
                                     colors.add(item_info['color'])
                             if len(colors) >= 2:
-                                candidates.append(match)
+                                filtered_candidates.append(match)
                         
-                        if candidates:
-                            # 가중치 기반 선택
-                            weights = [c['weight'] for c in candidates]
-                            selected_match = random.choices(candidates, weights=weights, k=1)[0]
+                        if filtered_candidates:
+                            candidates = filtered_candidates
+                            print(f"🎯 컬러 전문가 필터 적용: {len(candidates)}개 후보")
                         else:
-                            # 가중치 기반 선택
-                            weights = [m['weight'] for m in available_matches]
-                            selected_match = random.choices(available_matches, weights=weights, k=1)[0]
+                            print(f"⚠️ 컬러 전문가 필터 적용 불가, 전체 후보 사용")
                     
                     elif request.expert_type.value == "fitting_coordinator":
                         # 핏팅 코디네이터: 다양한 핏 정보가 있는 것 우선
-                        candidates = []
-                        for match in available_matches:
+                        filtered_candidates = []
+                        for match in candidates:
                             items = match['content'].get('extracted_items', {})
                             fits = set()
                             for category, item_info in items.items():
                                 if isinstance(item_info, dict) and item_info.get('fit'):
                                     fits.add(item_info['fit'])
                             if len(fits) >= 2:
-                                candidates.append(match)
+                                filtered_candidates.append(match)
                         
-                        if candidates:
-                            # 가중치 기반 선택
-                            weights = [c['weight'] for c in candidates]
-                            selected_match = random.choices(candidates, weights=weights, k=1)[0]
+                        if filtered_candidates:
+                            candidates = filtered_candidates
+                            print(f"🎯 핏팅 코디네이터 필터 적용: {len(candidates)}개 후보")
                         else:
-                            # 가중치 기반 선택
-                            weights = [m['weight'] for m in available_matches]
-                            selected_match = random.choices(available_matches, weights=weights, k=1)[0]
+                            print(f"⚠️ 핏팅 코디네이터 필터 적용 불가, 전체 후보 사용")
                     
+                    # 최종 선택 (균등 확률)
+                    if candidates:
+                        selected_match = random.choice(candidates)
+                        print(f"🎲 최종 선택: {selected_match['filename']} (점수: {selected_match['score']:.3f})")
                     else:
-                        # 기본: 가중치 기반 선택
-                        weights = [m['weight'] for m in available_matches]
-                        selected_match = random.choices(available_matches, weights=weights, k=1)[0]
+                        # 필터링 후 후보가 없으면 전체에서 선택
+                        selected_match = random.choice(available_matches)
+                        print(f"⚠️ 필터링 후 후보 없음, 전체에서 선택: {selected_match['filename']}")
                 else:
-                    # 후보가 적으면 가중치 기반 선택
-                    weights = [m.get('weight', 1.0) for m in available_matches]
-                    selected_match = random.choices(available_matches, weights=weights, k=1)[0]
+                    # 후보가 적으면 완전 랜덤 선택
+                    selected_match = random.choice(available_matches)
+                    print(f"🎲 후보 부족으로 랜덤 선택: {selected_match['filename']}")
                 
                 # 선택된 아이템을 최근 사용 목록에 추가
                 redis_service.add_recent_used_outfit(request.room_id, selected_match['filename'])
