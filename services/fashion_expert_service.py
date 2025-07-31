@@ -422,12 +422,19 @@ class SimpleFashionExpertService:
                     if is_sogeting and not has_formal_item:
                         continue
                     
-                    # 캐주얼한 아이템에 페널티
-                    casual_items = ['후드', '맨투맨', '반팔티', '티셔츠']
-                    for item in items_list:
-                        if any(casual in item.lower() for casual in casual_items):
-                            weight -= 0.3  # 캐주얼 아이템에 페널티
-                            break
+                    # 소개팅에서는 캐주얼한 아이템 완전 제외
+                    if is_sogeting:
+                        casual_items = ['후드', '맨투맨', '반팔티', '티셔츠']
+                        for item in items_list:
+                            if any(casual in item.lower() for casual in casual_items):
+                                continue  # 이 조합 완전 제외
+                    else:
+                        # 데이트 등에서는 캐주얼한 아이템에 페널티만
+                        casual_items = ['후드', '맨투맨', '반팔티', '티셔츠']
+                        for item in items_list:
+                            if any(casual in item.lower() for casual in casual_items):
+                                weight -= 0.3  # 캐주얼 아이템에 페널티
+                                break
                 
                 # 각 조건을 개별적으로 확인
                 items_match = any(any(keyword in item.lower() for keyword in user_keywords) for item in items_list)
