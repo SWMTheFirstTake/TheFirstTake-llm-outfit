@@ -408,8 +408,8 @@ class SimpleFashionExpertService:
                 is_sogeting = any(keyword in user_keywords for keyword in ['소개팅'])
                 
                 if is_formal_occasion:
-                    # 소개팅/데이트 등에서는 셔츠, 니트 등에 가중치 부여
-                    formal_items = ['셔츠', '니트', '블라우스', '가디건', '자켓', '코트']
+                    # 소개팅/데이트 등에서는 셔츠, 니트 등에 가중치 부여 (남자 대상)
+                    formal_items = ['셔츠', '니트', '가디건', '자켓', '코트']
                     has_formal_item = False
                     
                     for item in items_list:
