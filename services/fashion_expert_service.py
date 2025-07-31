@@ -89,8 +89,8 @@ class SimpleFashionExpertService:
 
 **대화 예시 (다양한 스타일):**
 - "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 요즘 유행이야. {silhouette_balance}가 괜찮아."
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 트렌디해. {styling_points} 포인트가 요즘 인기야."
-- "이 조합 인스타에서 자주 보여. {fit_details}가 트렌디해. {top_color} {top_item} + {bottom_color} {bottom_item}이 핫해."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 트렌디해. {styling_points} 포인트 요즘 많이입어."
+- "이 조합 인스타에서 자주 보여. {fit_details}가 트렌디해. {top_color} {top_item} + {bottom_color} {bottom_item} 많이입어."
 - "{top_item} 요즘 많이 입어. {top_color} 컬러가 이번 시즌에 괜찮아. {bottom_color} {bottom_item}도 트렌디해."
 
 **핵심 규칙:**
@@ -378,7 +378,7 @@ class SimpleFashionExpertService:
                 if any(keyword in item['item'].lower() for keyword in user_keywords):
                     actual_items.append(item)
             
-            # 아웃핏 조합 매칭
+            # 아웃핏 조합 매칭 (화이트+화이트 제외, 상황별 가중치 적용)
             for combo in self.fashion_reference_data['outfit_combinations']:
                 # items가 리스트인지 확인하고 안전하게 처리
                 items_list = combo['items'] if isinstance(combo['items'], list) else [str(combo['items'])]
@@ -391,14 +391,43 @@ class SimpleFashionExpertService:
                     else:
                         occasion_str = str(combo['occasion']).lower()
                 
+                # 화이트+화이트 조합 제외 (상의/하의만 체크, 신발 제외)
+                white_count = 0
+                for item in items_list:
+                    # 신발 관련 키워드가 포함된 아이템은 제외
+                    if any(shoes_keyword in item.lower() for shoes_keyword in ['신발', '슈즈', '로퍼', '스니커', '부츠', '샌들', 'shoes', 'sneakers', 'loafers', 'boots']):
+                        continue
+                    if '화이트' in item.lower() or 'white' in item.lower():
+                        white_count += 1
+                if white_count >= 2:  # 상의/하의에서 화이트가 2개 이상이면 제외
+                    continue
+                
+                # 상황별 가중치 계산
+                weight = 1.0
+                is_formal_occasion = any(keyword in user_keywords for keyword in ['소개팅', '데이트', '면접', '출근', '비즈니스'])
+                
+                if is_formal_occasion:
+                    # 소개팅/데이트 등에서는 셔츠, 니트 등에 가중치 부여
+                    formal_items = ['셔츠', '니트', '블라우스', '가디건', '자켓', '코트']
+                    for item in items_list:
+                        if any(formal in item.lower() for formal in formal_items):
+                            weight += 0.5  # 셔츠/니트 등에 가중치
+                            break
+                    
+                    # 캐주얼한 아이템에 페널티
+                    casual_items = ['후드', '맨투맨', '반팔티', '티셔츠']
+                    for item in items_list:
+                        if any(casual in item.lower() for casual in casual_items):
+                            weight -= 0.3  # 캐주얼 아이템에 페널티
+                            break
+                
                 # 각 조건을 개별적으로 확인
-                # combination_match = any(keyword in combo['combination'].lower() for keyword in user_keywords)  # 조합명 매칭 제거
                 items_match = any(any(keyword in item.lower() for keyword in user_keywords) for item in items_list)
                 occasion_match = any(keyword in occasion_str for keyword in user_keywords) if occasion_str else False
                 
                 # 디버깅: 매칭 과정 출력
                 if user_keywords and any(keyword in ['소개팅', '데이트', '출근'] for keyword in user_keywords):
-                    print(f"🔍 매칭 확인: '{combo['combination']}' (occasion: '{combo['occasion']}')")
+                    print(f"🔍 매칭 확인: '{combo['combination']}' (occasion: '{combo['occasion']}', weight: {weight:.1f})")
                     print(f"   user_keywords: {user_keywords}")
                     print(f"   occasion_str: '{occasion_str}'")
                     print(f"   occasion_match: {occasion_match}")
@@ -407,10 +436,13 @@ class SimpleFashionExpertService:
                 
                 # 디버깅 출력
                 if occasion_match:
-                    print(f"🎯 매칭 발견: '{combo['combination']}' (occasion: '{combo['occasion']}')")
+                    print(f"🎯 매칭 발견: '{combo['combination']}' (occasion: '{combo['occasion']}', weight: {weight:.1f})")
                 
-                if items_match or occasion_match:  # combination_match 제거
-                    actual_combos.append(combo)
+                if items_match or occasion_match:
+                    # 가중치를 포함하여 저장
+                    combo_with_weight = combo.copy()
+                    combo_with_weight['weight'] = weight
+                    actual_combos.append(combo_with_weight)
             
             # 컬러 추천 매칭
             for color in self.fashion_reference_data['color_recommendations']:
@@ -566,16 +598,25 @@ class SimpleFashionExpertService:
                                         # print(f"✅ 스트라이프 셔츠 제외, 대체 조합 선택: '{c['combination']}'")
                                         break
                 
-                # 전문가별 선택이 실패한 경우 일반적인 우선순위
+                # 전문가별 선택이 실패한 경우 가중치 기반 우선순위
                 if combo is None:
-                    # 1순위: occasion이 정확히 매칭되는 것
-                    for c in actual_combos:
-                        if c.get('occasion') and any(keyword in c['occasion'].lower() for keyword in user_keywords):
-                            combo = c
-                            # print(f"✅ occasion 매칭으로 선택: '{c['combination']}' (occasion: '{c['occasion']}')")
-                            break
+                    # 가중치가 높은 순으로 정렬
+                    sorted_combos = sorted(actual_combos, key=lambda x: x.get('weight', 1.0), reverse=True)
                     
-                    # 2순위: 첫 번째 조합 사용
+                    # 1순위: 가중치가 가장 높은 조합
+                    if sorted_combos:
+                        combo = sorted_combos[0]
+                        # print(f"✅ 가중치 기반 선택: '{combo['combination']}' (weight: {combo.get('weight', 1.0):.1f})")
+                    
+                    # 2순위: occasion이 정확히 매칭되는 것
+                    if combo is None:
+                        for c in actual_combos:
+                            if c.get('occasion') and any(keyword in c['occasion'].lower() for keyword in user_keywords):
+                                combo = c
+                                # print(f"✅ occasion 매칭으로 선택: '{c['combination']}' (occasion: '{c['occasion']}')")
+                                break
+                    
+                    # 3순위: 첫 번째 조합 사용
                     if combo is None and actual_combos:
                         combo = actual_combos[0]
                         # print(f"⚠️ 전문가별 선택 실패, 첫 번째 조합 사용: '{combo['combination']}'")
@@ -887,37 +928,37 @@ class SimpleFashionExpertService:
         shoes_info = json_data.get("shoes", {})
         styling_info = json_data.get("styling_methods", {})
         
-        # 전문가별 다양한 대화 스타일
+        # 전문가별 다양한 대화 스타일 (조사 문제 해결)
         import random
         
         expert_responses = {
             FashionExpertType.STYLE_ANALYST: [
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 나쁘지 않아. {styling_info.get('styling_points', '')} 포인트가 괜찮아.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 체형에 적당해. {styling_info.get('fit_details', '')}라서 날씬해 보일 거야.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 괜찮네. {styling_info.get('fit_details', '')}라서 체형이 좀 보완될 거야.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 나쁘지 않아. {styling_info.get('tuck_degree', '')} 스타일링이 깔끔해.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합의 핏감은 괜찮아. {top_info.get('fit', '')}라서 체형을 보완해줘."
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 나쁘지 않아. {styling_info.get('styling_points', '')} 포인트 괜찮아.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 체형에 적당해. {styling_info.get('fit_details', '')}라서 날씬해 보일 거야.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮네. {styling_info.get('fit_details', '')}라서 체형이 좀 보완될 거야.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 나쁘지 않아. {styling_info.get('tuck_degree', '')} 스타일링 깔끔해.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 핏감 괜찮아. {top_info.get('fit', '')}라서 체형을 보완해줘."
             ],
             FashionExpertType.TREND_EXPERT: [
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 요즘 유행이야. {styling_info.get('silhouette_balance', '')}가 괜찮아.",
-                f"이 조합 인스타에서 자주 보여. {styling_info.get('fit_details', '')}가 트렌디해. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')}이 핫해.",
-                f"{top_info.get('item', '')} 요즘 많이 입어. {top_info.get('color', '')} 컬러가 이번 시즌에 괜찮아. {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 트렌디해.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 트렌디해. {styling_info.get('styling_points', '')} 포인트가 요즘 인기야.",
-                f"요즘 트렌드를 보면 {top_info.get('material', '')} {top_info.get('item', '')}이 괜찮아. {top_info.get('material', '')} 소재도 핫해. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 인기야."
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 요즘 유행이야. {styling_info.get('silhouette_balance', '')} 괜찮아.",
+                f"이 조합 인스타에서 자주 보여. {styling_info.get('fit_details', '')} 트렌디해. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 많이입어.",
+                f"{top_info.get('item', '')} 요즘 많이 입어. {top_info.get('color', '')} 컬러 이번 시즌에 괜찮아. {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 트렌디해.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 트렌디해. {styling_info.get('styling_points', '')} 포인트 요즘 많이입어.",
+                f"요즘 트렌드 보면 {top_info.get('material', '')} {top_info.get('item', '')} 괜찮아. {top_info.get('material', '')} 소재도 많이입어. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 많이입어."
             ],
             FashionExpertType.COLOR_EXPERT: [
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 괜찮아. 톤온톤이 나쁘지 않아.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 퍼스널 컬러랑 어울려. {top_info.get('color', '')}가 피부톤을 밝게 해줘.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합의 색상 밸런스가 괜찮아. {styling_info.get('styling_points', '')} 포인트도 색상과 잘 맞아.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합에서 색상이 좀 어색해. {top_info.get('color', '')} 대신 다른 색상은 어떨까?",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 톤온톤으로 잘 어우러져."
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮아. 톤온톤 나쁘지 않아.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 퍼스널 컬러랑 어울려. {top_info.get('color', '')} 피부톤 밝게 해줘.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 색상 밸런스 괜찮아. {styling_info.get('styling_points', '')} 포인트 색상과 잘 맞아.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 색상 좀 어색해. {top_info.get('color', '')} 대신 다른 색상 어떨까?",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 톤온톤으로 잘 어우러져."
             ],
             FashionExpertType.FITTING_COORDINATOR: [
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 괜찮아. {styling_info.get('silhouette_balance', '')}가 나쁘지 않아.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 괜찮아. {styling_info.get('fit_details', '')}와 {styling_info.get('tuck_degree', '')}가 균형잡혀 있어.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 피팅 관점에서는 괜찮아.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 전체적으로는 좋은데 {styling_info.get('styling_points', '')} 포인트가 특히 잘 어울려.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 전체적으로 균형감이 괜찮아."
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮아. {styling_info.get('silhouette_balance', '')} 나쁘지 않아.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮아. {styling_info.get('fit_details', '')}와 {styling_info.get('tuck_degree', '')} 균형잡혀 있어.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 피팅 관점에서는 괜찮아.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 전체적으로는 좋은데 {styling_info.get('styling_points', '')} 포인트 특히 잘 어울려.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 전체적으로 균형감 괜찮아."
             ]
         }
         
@@ -939,7 +980,7 @@ class SimpleFashionExpertService:
                     f" {shoe_color} {shoe_item}도 어울릴 것 같아."
                 ],
                 FashionExpertType.TREND_EXPERT: [
-                    f" {shoe_color} {shoe_item}도 요즘 핫해.",
+                    f" {shoe_color} {shoe_item}도 요즘 많이입어.",
                     f" {shoe_color} {shoe_item}도 트렌디해.",
                     f" {shoe_color} {shoe_item}도 인스타에서 자주 보여."
                 ],
