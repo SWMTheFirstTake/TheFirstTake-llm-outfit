@@ -933,32 +933,32 @@ class SimpleFashionExpertService:
         
         expert_responses = {
             FashionExpertType.STYLE_ANALYST: [
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 나쁘지 않아. {styling_info.get('styling_points', '')} 포인트 괜찮아.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 체형에 적당해. {styling_info.get('fit_details', '')}라서 날씬해 보일 거야.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮네. {styling_info.get('fit_details', '')}라서 체형이 좀 보완될 거야.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 나쁘지 않아. {styling_info.get('tuck_degree', '')} 스타일링 깔끔해.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 핏감 괜찮아. {top_info.get('fit', '')}라서 체형을 보완해줘."
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 나쁘지 않아. {styling_info.get('styling_points', '')} 포인트 괜찮아.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 체형에 적당해. {styling_info.get('fit_details', '')} 날씬해 보일 거야.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮네. {styling_info.get('fit_details', '')} 체형이 좀 보완될 거야.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 나쁘지 않아. {styling_info.get('tuck_degree', '')} 스타일링 깔끔해.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 핏 괜찮아. {top_info.get('fit', '')} 체형을 보완해줘."
             ],
             FashionExpertType.TREND_EXPERT: [
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 요즘 유행이야. {styling_info.get('silhouette_balance', '')} 괜찮아.",
-                f"이 조합 인스타에서 자주 보여. {styling_info.get('fit_details', '')} 트렌디해. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 많이입어.",
-                f"{top_info.get('item', '')} 요즘 많이 입어. {top_info.get('color', '')} 컬러 이번 시즌에 괜찮아. {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 트렌디해.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 트렌디해. {styling_info.get('styling_points', '')} 포인트 요즘 많이입어.",
-                f"요즘 트렌드 보면 {top_info.get('material', '')} {top_info.get('item', '')} 괜찮아. {top_info.get('material', '')} 소재도 많이입어. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 많이입어."
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 요즘 유행이야. {styling_info.get('silhouette_balance', '')} 괜찮아.",
+                f"이 조합 인스타에서 자주 보여. {styling_info.get('fit_details', '')} 트렌디해. {top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 많이입어.",
+                f"{top_info.get('fit', '')} {top_info.get('item', '')} 요즘 많이 입어. {top_info.get('color', '')} 컬러 이번 시즌에 괜찮아. {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 트렌디해.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 트렌디해. {styling_info.get('styling_points', '')} 포인트 요즘 많이입어.",
+                f"요즘 트렌드 보면 {top_info.get('material', '')} {top_info.get('fit', '')} {top_info.get('item', '')} 괜찮아. {top_info.get('material', '')} 소재도 많이입어. {top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 많이입어."
             ],
             FashionExpertType.COLOR_EXPERT: [
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮아. 톤온톤 나쁘지 않아.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 퍼스널 컬러랑 어울려. {top_info.get('color', '')} 피부톤 밝게 해줘.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 색상 밸런스 괜찮아. {styling_info.get('styling_points', '')} 포인트 색상과 잘 맞아.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 색상 좀 어색해. {top_info.get('color', '')} 대신 다른 색상 어떨까?",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 톤온톤으로 잘 어우러져."
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮아. 톤온톤 나쁘지 않아.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 퍼스널 컬러랑 어울려. {top_info.get('color', '')} 피부톤 밝게 해줘.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 색상 밸런스 괜찮아. {styling_info.get('styling_points', '')} 포인트 색상과 잘 맞아.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 색상 좀 어색해. {top_info.get('color', '')} 대신 다른 색상 어떨까?",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 톤온톤으로 잘 어우러져."
             ],
             FashionExpertType.FITTING_COORDINATOR: [
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮아. {styling_info.get('silhouette_balance', '')} 나쁘지 않아.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮아. {styling_info.get('fit_details', '')}와 {styling_info.get('tuck_degree', '')} 균형잡혀 있어.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 피팅 관점에서는 괜찮아.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 전체적으로는 좋은데 {styling_info.get('styling_points', '')} 포인트 특히 잘 어울려.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 전체적으로 균형감 괜찮아."
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮아. {styling_info.get('silhouette_balance', '')} 나쁘지 않아.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮아. {styling_info.get('fit_details', '')}와 {styling_info.get('tuck_degree', '')} 균형잡혀 있어.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 피팅 관점에서는 괜찮아.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 전체적으로는 좋은데 {styling_info.get('styling_points', '')} 포인트 특히 잘 어울려.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 전체적으로 균형감 괜찮아."
             ]
         }
         
@@ -1006,6 +1006,68 @@ class SimpleFashionExpertService:
                     shoe_expression = shoe_expression.replace(f"{shoe_color} {shoe_item}", shoe_item)
             
             response += shoe_expression
+        
+        # 상황별 필터링 및 용어 개선
+        response = self._improve_response_for_occasion(response, user_input)
+        
+        return response
+
+    def _improve_response_for_occasion(self, response: str, user_input: str) -> str:
+        """상황별 필터링 및 용어 개선"""
+        # 소개팅/데이트/비즈니스 상황 체크
+        is_formal_occasion = any(keyword in user_input.lower() for keyword in ['소개팅', '데이트', '면접', '출근', '비즈니스', '회사'])
+        
+        # 전문 용어를 일반인이 알기 쉬운 용어로 변경
+        term_replacements = {
+            '드레이프': '자연스러운 주름',
+            '실루엣': '옷의 형태',
+            '퍼스널 컬러': '나에게 맞는 색상',
+            '톤온톤': '같은 색상 계열',
+            '모노톤': '한 가지 색상',
+            '핏감': '핏'
+        }
+        
+        for old_term, new_term in term_replacements.items():
+            response = response.replace(old_term, new_term)
+        
+        # "라서" 표현을 문맥에 맞게 개선
+        import random
+        la_replacement_options = ['덕분에', '때문에', '이어서', '그래서']
+        
+        # "라서"가 포함된 문장을 찾아서 자연스럽게 변경
+        if '라서' in response:
+            # 문장을 분리해서 "라서" 부분을 개선
+            sentences = response.split('.')
+            improved_sentences = []
+            
+            for sentence in sentences:
+                if '라서' in sentence:
+                    # "라서" 앞부분과 뒷부분을 분리
+                    parts = sentence.split('라서')
+                    if len(parts) == 2:
+                        before_la = parts[0].strip()
+                        after_la = parts[1].strip()
+                        replacement = random.choice(la_replacement_options)
+                        improved_sentence = f"{before_la} {replacement} {after_la}"
+                        improved_sentences.append(improved_sentence)
+                    else:
+                        improved_sentences.append(sentence)
+                else:
+                    improved_sentences.append(sentence)
+            
+            response = '. '.join(improved_sentences)
+        
+        # 소개팅/데이트/비즈니스에서 튀는 액세서리 제거
+        if is_formal_occasion:
+            formal_inappropriate_items = [
+                '선글라스', '캡', '비니', '후드', '맨투맨', '반팔티', '티셔츠'
+            ]
+            for item in formal_inappropriate_items:
+                if item in response:
+                    # 해당 아이템이 포함된 문장을 제거하거나 대체
+                    response = response.replace(f"{item}로 액센트", "깔끔한 포인트")
+                    response = response.replace(f"{item} 포인트", "심플한 포인트")
+                    response = response.replace(f"{item}로", "심플하게")
         
         return response
 
