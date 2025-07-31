@@ -405,14 +405,22 @@ class SimpleFashionExpertService:
                 # 상황별 가중치 계산
                 weight = 1.0
                 is_formal_occasion = any(keyword in user_keywords for keyword in ['소개팅', '데이트', '면접', '출근', '비즈니스'])
+                is_sogeting = any(keyword in user_keywords for keyword in ['소개팅'])
                 
                 if is_formal_occasion:
                     # 소개팅/데이트 등에서는 셔츠, 니트 등에 가중치 부여
                     formal_items = ['셔츠', '니트', '블라우스', '가디건', '자켓', '코트']
+                    has_formal_item = False
+                    
                     for item in items_list:
                         if any(formal in item.lower() for formal in formal_items):
                             weight += 0.5  # 셔츠/니트 등에 가중치
+                            has_formal_item = True
                             break
+                    
+                    # 소개팅에서는 셔츠/니트가 포함되지 않은 조합은 제외
+                    if is_sogeting and not has_formal_item:
+                        continue
                     
                     # 캐주얼한 아이템에 페널티
                     casual_items = ['후드', '맨투맨', '반팔티', '티셔츠']
@@ -950,7 +958,7 @@ class SimpleFashionExpertService:
                 f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮아. 톤온톤 나쁘지 않아.",
                 f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 퍼스널 컬러랑 어울려. {top_info.get('color', '')} 피부톤 밝게 해줘.",
                 f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 색상 밸런스 괜찮아. {styling_info.get('styling_points', '')} 포인트 색상과 잘 맞아.",
-                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 색상 좀 어색해. {top_info.get('color', '')} 대신 다른 색상 어떨까?",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 색상 조합이 깔끔해. {top_info.get('color', '')} 컬러가 포인트가 되네.",
                 f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 톤온톤으로 잘 어우러져."
             ],
             FashionExpertType.FITTING_COORDINATOR: [
