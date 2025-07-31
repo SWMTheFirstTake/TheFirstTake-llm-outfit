@@ -420,14 +420,22 @@ class SimpleFashionExpertService:
                     
                     # 소개팅에서는 셔츠/니트가 포함되지 않은 조합은 제외
                     if is_sogeting and not has_formal_item:
+                        print(f"🚫 소개팅에서 제외: '{combo['combination']}' (정장 아이템 없음)")
                         continue
+                    elif is_sogeting and has_formal_item:
+                        print(f"✅ 소개팅에서 통과: '{combo['combination']}' (정장 아이템 포함)")
                     
                     # 소개팅에서는 캐주얼한 아이템 완전 제외
                     if is_sogeting:
                         casual_items = ['후드', '맨투맨', '반팔티', '티셔츠']
+                        has_casual_item = False
                         for item in items_list:
                             if any(casual in item.lower() for casual in casual_items):
-                                continue  # 이 조합 완전 제외
+                                has_casual_item = True
+                                print(f"🚫 소개팅에서 제외: '{combo['combination']}' (캐주얼 아이템: {item})")
+                                break
+                        if has_casual_item:
+                            continue  # 이 조합 완전 제외
                     else:
                         # 데이트 등에서는 캐주얼한 아이템에 페널티만
                         casual_items = ['후드', '맨투맨', '반팔티', '티셔츠']
