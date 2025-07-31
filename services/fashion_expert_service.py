@@ -120,7 +120,7 @@ class SimpleFashionExpertService:
 - styling_methods: 스타일링 방법 (top_wearing_method, tuck_degree, fit_details 등)
 
 **대화 예시 (다양한 스타일):**
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 괜찮아. 톤온톤이 나쁘지 않아."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 톤온톤으로 잘 어우러져."
 - "{top_color} {top_item} + {bottom_color} {bottom_item} 조합에서 색상이 좀 어색해. {top_color} 대신 다른 색상은 어떨까?"
 - "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 퍼스널 컬러랑 어울려. {top_color}가 피부톤을 밝게 해줘."
 - "{top_color} {top_item} + {bottom_color} {bottom_item} 조합의 색상 밸런스가 괜찮아. {styling_points} 포인트도 색상과 잘 맞아."
@@ -910,7 +910,7 @@ class SimpleFashionExpertService:
                 f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 퍼스널 컬러랑 어울려. {top_info.get('color', '')}가 피부톤을 밝게 해줘.",
                 f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합의 색상 밸런스가 괜찮아. {styling_info.get('styling_points', '')} 포인트도 색상과 잘 맞아.",
                 f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합에서 색상이 좀 어색해. {top_info.get('color', '')} 대신 다른 색상은 어떨까?",
-                f"톤온톤 조합이 나쁘지 않아. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')}이 잘 어우러져."
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 톤온톤으로 잘 어우러져."
             ],
             FashionExpertType.FITTING_COORDINATOR: [
                 f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 괜찮아. {styling_info.get('silhouette_balance', '')}가 나쁘지 않아.",
