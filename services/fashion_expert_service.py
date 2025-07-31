@@ -56,9 +56,9 @@ class SimpleFashionExpertService:
 - styling_methods: 스타일링 방법 (top_wearing_method, tuck_degree, fit_details 등)
 
 **대화 예시 (다양한 스타일):**
-- "{top_color} {top_item}이 괜찮네. {fit_details}라서 체형이 좀 보완될 거야. {bottom_color} {bottom_item}도 함께 착용하면 좋겠어."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 나쁘지 않아. {styling_points} 포인트가 괜찮아."
 - "{tuck_degree} 스타일링이 좀 아쉽다. {silhouette_balance}를 위해 다른 방법은 어떨까?"
-- "{top_color} {top_item}과 {bottom_color} {bottom_item} 조합이 나쁘지 않아. {styling_points} 포인트가 괜찮아."
+- "{top_color} {top_item}이 괜찮네. {fit_details}라서 체형이 좀 보완될 거야. {bottom_color} {bottom_item}도 잘 어울려."
 - "체형에 {top_item}이 적당해. {fit_details}라서 날씬해 보일 거야. {bottom_color} {bottom_item} 조합이 나쁘지 않아."
 
 **핵심 규칙:**
@@ -88,10 +88,10 @@ class SimpleFashionExpertService:
 - styling_methods: 스타일링 방법 (top_wearing_method, tuck_degree, fit_details 등)
 
 **대화 예시 (다양한 스타일):**
-- "{top_item} 요즘 많이 입어. {top_color} 컬러가 이번 시즌에 괜찮아. {bottom_color} {bottom_item}도 함께 착용하면 좋겠어."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 요즘 유행이야. {silhouette_balance}가 괜찮아."
 - "{styling_points} 스타일링이 좀 올드해. 요즘은 다른 방법이 더 인기 있어."
-- "이 조합 인스타에서 자주 보여. {fit_details}가 트렌디해. {bottom_color} {bottom_item}도 함께 착용하면 좋겠어."
-- "{top_color} {top_item}과 {bottom_color} {bottom_item} 조합이 요즘 유행이야. {silhouette_balance}가 괜찮아."
+- "이 조합 인스타에서 자주 보여. {fit_details}가 트렌디해. {top_color} {top_item} + {bottom_color} {bottom_item}이 핫해."
+- "{top_item} 요즘 많이 입어. {top_color} 컬러가 이번 시즌에 괜찮아. {bottom_color} {bottom_item}도 트렌디해."
 
 **핵심 규칙:**
 1. 반드시 JSON 데이터의 실제 정보를 사용하되, 자연스럽게 녹여내기
@@ -120,9 +120,9 @@ class SimpleFashionExpertService:
 - styling_methods: 스타일링 방법 (top_wearing_method, tuck_degree, fit_details 등)
 
 **대화 예시 (다양한 스타일):**
-- "{top_color} {top_item}과 {bottom_color} {bottom_item} 조합이 괜찮아. 톤온톤이 나쁘지 않아."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 괜찮아. 톤온톤이 나쁘지 않아."
 - "색상 조합이 좀 어색해. {top_color} 대신 다른 색상은 어떨까?"
-- "퍼스널 컬러랑 어울려. {top_color}가 피부톤을 밝게 해줘. {bottom_color} {bottom_item}도 함께 착용하면 좋겠어."
+- "퍼스널 컬러랑 어울려. {top_color}가 피부톤을 밝게 해줘. {top_color} {top_item} + {bottom_color} {bottom_item} 조합이 좋아."
 - "색상 밸런스가 괜찮아. {styling_points} 포인트도 색상과 잘 맞아."
 
 **핵심 규칙:**
@@ -152,10 +152,10 @@ class SimpleFashionExpertService:
 - styling_methods: 스타일링 방법 (top_wearing_method, tuck_degree, fit_details 등)
 
 **대화 예시 (다양한 스타일):**
-- "{top_color} {top_item}과 {bottom_color} {bottom_item} 조합이 괜찮아. {silhouette_balance}가 나쁘지 않아."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 괜찮아. {silhouette_balance}가 나쁘지 않아."
 - "전체적으로는 좋은데 {styling_points} 부분을 조금 바꾸면 더 나을 것 같아."
-- "이 룩 괜찮아. {fit_details}와 {tuck_degree}가 균형잡혀 있어. {bottom_color} {bottom_item}도 함께 착용하면 좋겠어."
-- "피팅 관점에서는 괜찮아. {top_color}와 {bottom_color} 조합도 나쁘지 않아."
+- "이 룩 괜찮아. {fit_details}와 {tuck_degree}가 균형잡혀 있어. {top_color} {top_item} + {bottom_color} {bottom_item} 조합이 좋아."
+- "피팅 관점에서는 괜찮아. {top_color} {top_item} + {bottom_color} {bottom_item} 조합도 나쁘지 않아."
 
 **핵심 규칙:**
 1. 반드시 JSON 데이터의 실제 정보를 사용하되, 자연스럽게 녹여내기
@@ -892,32 +892,32 @@ class SimpleFashionExpertService:
         
         expert_responses = {
             FashionExpertType.STYLE_ANALYST: [
-                f"{top_info.get('color', '')} {top_info.get('item', '')}이 괜찮네. {styling_info.get('fit_details', '')}라서 체형이 좀 보완될 거야. {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 함께 착용하면 좋겠어.",
-                f"체형에 {top_info.get('item', '')}이 적당해. {styling_info.get('fit_details', '')}라서 날씬해 보일 거야. {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 나쁘지 않아.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')}과 {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 나쁘지 않아. {styling_info.get('styling_points', '')} 포인트가 괜찮아.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 나쁘지 않아. {styling_info.get('styling_points', '')} 포인트가 괜찮아.",
+                f"체형에 {top_info.get('item', '')}이 적당해. {styling_info.get('fit_details', '')}라서 날씬해 보일 거야. {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 잘 어울려.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')}이 괜찮네. {styling_info.get('fit_details', '')}라서 체형이 좀 보완될 거야. {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 나쁘지 않아.",
                 f"{styling_info.get('tuck_degree', '')} 스타일링이 좀 아쉽다. {styling_info.get('silhouette_balance', '')}를 위해 다른 방법은 어떨까?",
-                f"핏감은 괜찮아. {top_info.get('fit', '')}라서 체형을 보완해줘. {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 함께 착용하면 좋겠어."
+                f"핏감은 괜찮아. {top_info.get('fit', '')}라서 체형을 보완해줘. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 좋아."
             ],
             FashionExpertType.TREND_EXPERT: [
-                f"{top_info.get('item', '')} 요즘 많이 입어. {top_info.get('color', '')} 컬러가 이번 시즌에 괜찮아. {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 함께 착용하면 좋겠어.",
-                f"이 조합 인스타에서 자주 보여. {styling_info.get('fit_details', '')}가 트렌디해. {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 함께 착용하면 좋겠어.",
-                f"{top_info.get('color', '')} {top_info.get('item', '')}과 {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 요즘 유행이야. {styling_info.get('silhouette_balance', '')}가 괜찮아.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 요즘 유행이야. {styling_info.get('silhouette_balance', '')}가 괜찮아.",
+                f"이 조합 인스타에서 자주 보여. {styling_info.get('fit_details', '')}가 트렌디해. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')}이 핫해.",
+                f"{top_info.get('item', '')} 요즘 많이 입어. {top_info.get('color', '')} 컬러가 이번 시즌에 괜찮아. {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 트렌디해.",
                 f"{styling_info.get('styling_points', '')} 스타일링이 좀 올드해. 요즘은 다른 방법이 더 인기 있어.",
-                f"요즘 트렌드를 보면 {top_info.get('material', '')} {top_info.get('item', '')}이 괜찮아. {top_info.get('material', '')} 소재도 핫해. {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 함께 착용하면 좋겠어."
+                f"요즘 트렌드를 보면 {top_info.get('material', '')} {top_info.get('item', '')}이 괜찮아. {top_info.get('material', '')} 소재도 핫해. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 인기야."
             ],
             FashionExpertType.COLOR_EXPERT: [
-                f"{top_info.get('color', '')} {top_info.get('item', '')}과 {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 괜찮아. 톤온톤이 나쁘지 않아.",
-                f"퍼스널 컬러랑 어울려. {top_info.get('color', '')}가 피부톤을 밝게 해줘. {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 함께 착용하면 좋겠어.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 괜찮아. 톤온톤이 나쁘지 않아.",
+                f"퍼스널 컬러랑 어울려. {top_info.get('color', '')}가 피부톤을 밝게 해줘. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 좋아.",
                 f"색상 밸런스가 괜찮아. {styling_info.get('styling_points', '')} 포인트도 색상과 잘 맞아.",
                 f"색상 조합이 좀 어색해. {top_info.get('color', '')} 대신 다른 색상은 어떨까?",
-                f"톤온톤 조합이 나쁘지 않아. {top_info.get('color', '')}와 {bottom_info.get('color', '')}가 잘 어우러져."
+                f"톤온톤 조합이 나쁘지 않아. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')}이 잘 어우러져."
             ],
             FashionExpertType.FITTING_COORDINATOR: [
-                f"{top_info.get('color', '')} {top_info.get('item', '')}과 {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 괜찮아. {styling_info.get('silhouette_balance', '')}가 나쁘지 않아.",
-                f"이 룩 괜찮아. {styling_info.get('fit_details', '')}와 {styling_info.get('tuck_degree', '')}가 균형잡혀 있어. {bottom_info.get('color', '')} {bottom_info.get('item', '')}도 함께 착용하면 좋겠어.",
-                f"피팅 관점에서는 괜찮아. {top_info.get('color', '')}와 {bottom_info.get('color', '')} 조합도 나쁘지 않아.",
+                f"{top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 괜찮아. {styling_info.get('silhouette_balance', '')}가 나쁘지 않아.",
+                f"이 룩 괜찮아. {styling_info.get('fit_details', '')}와 {styling_info.get('tuck_degree', '')}가 균형잡혀 있어. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 좋아.",
+                f"피팅 관점에서는 괜찮아. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합도 나쁘지 않아.",
                 f"전체적으로는 좋은데 {styling_info.get('styling_points', '')} 부분을 조금 바꾸면 더 나을 것 같아.",
-                f"전체적으로 균형감이 괜찮아. {styling_info.get('silhouette_balance', '')}와 {styling_info.get('fit_details', '')}가 잘 맞아."
+                f"전체적으로 균형감이 괜찮아. {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합이 잘 맞아."
             ]
         }
         
@@ -925,9 +925,19 @@ class SimpleFashionExpertService:
         response_pool = expert_responses.get(expert_type, expert_responses[FashionExpertType.STYLE_ANALYST])
         response = random.choice(response_pool)
         
-        # 추가 정보 (신발, 액세서리 등) - 신발은 항상 추천
+        # 추가 정보 (신발, 액세서리 등) - 신발은 항상 추천 (기호 사용)
         if shoes_info.get("item"):
-            response += f" {shoes_info.get('color', '')} {shoes_info.get('item', '')}도 함께 착용하면 좋겠어."
+            # 색상 중복 방지
+            shoe_color = shoes_info.get('color', '')
+            shoe_item = shoes_info.get('item', '')
+            if shoe_color and shoe_item:
+                # 색상이 이미 아이템명에 포함되어 있으면 색상 생략
+                if shoe_color.lower() in shoe_item.lower():
+                    response += f" + {shoe_item}"
+                else:
+                    response += f" + {shoe_color} {shoe_item}"
+            else:
+                response += f" + {shoe_item}"
         
         return response
 
