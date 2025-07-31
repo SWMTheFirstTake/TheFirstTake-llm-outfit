@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 이미지 다운로드 및 S3 업로드 스크립트
-improved_mens_summer_fashion.json 파일의 이미지들을 S3에 업로드
+korean_mens_summer_fashion_pinterest.json 파일의 이미지들을 S3에 업로드
 """
 
 import json
@@ -139,7 +139,7 @@ class ImageUploader:
             print(f"⚠️ 임시 디렉토리 정리 실패: {e}")
 
 def main():
-    json_file = "improved_mens_summer_fashion.json"
+    json_file = "korean_mens_summer_fashion_pinterest.json"
     
     if not os.path.exists(json_file):
         print(f"❌ 파일을 찾을 수 없습니다: {json_file}")

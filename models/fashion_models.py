@@ -21,6 +21,7 @@ class ExpertAnalysisRequest(BaseModel):
     expert_type: FashionExpertType
     user_profile: Optional[Dict] = None
     context_info: Optional[Dict] = None
+    json_data: Optional[Dict] = None  # JSON 분석 결과 데이터
 
 class ExpertChainRequest(BaseModel):
     user_input: str

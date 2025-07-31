@@ -77,6 +77,31 @@
             color: #666;
             margin-top: 5px;
         }
+        .file-item {
+            position: relative;
+        }
+        .delete-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+        .delete-btn:hover {
+            opacity: 1;
+            background: #c82333;
+        }
+        .file-item:hover .delete-btn {
+            opacity: 1;
+        }
         .content-viewer {
             border: 1px solid #ddd;
             padding: 15px;
@@ -297,6 +322,7 @@
                         크기: ${(file.size / 1024).toFixed(1)}KB | 
                         수정일: ${new Date(file.last_modified).toLocaleString()}
                     </div>
+                    <button class="delete-btn" onclick="deleteFile('${file.filename}', event)" title="이 아웃핏 삭제">🗑️</button>
                 </div>
             `).join('');
         }
@@ -500,6 +526,43 @@
                 addSituation();
             }
         });
+
+        // 파일 삭제
+        async function deleteFile(filename, event) {
+            // 이벤트 버블링 방지
+            event.stopPropagation();
+            
+            // 확인 대화상자
+            if (!confirm(`정말로 "${filename}" 아웃핏을 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.\n- JSON 파일과 이미지 파일이 모두 삭제됩니다.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/delete-outfit/${filename}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess(`아웃핏 "${filename}"이 성공적으로 삭제되었습니다!`);
+                    
+                    // 현재 선택된 파일이 삭제된 파일이면 선택 해제
+                    if (selectedFilename === filename) {
+                        selectedFilename = '';
+                        document.getElementById('contentSection').style.display = 'none';
+                        document.getElementById('noFileSelected').style.display = 'block';
+                    }
+                    
+                    // 파일 목록 새로고침
+                    await loadJsonFiles();
+                } else {
+                    showError('삭제에 실패했습니다: ' + data.message);
+                }
+            } catch (error) {
+                showError('삭제에 실패했습니다: ' + error.message);
+            }
+        }
     </script>
 </body>
 </html> 

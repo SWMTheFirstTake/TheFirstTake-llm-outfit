@@ -1,101 +1,3 @@
-# # from selenium import webdriver
-
-# # # 간단 테스트
-# # try:
-# #     driver = webdriver.Chrome()
-# #     driver.get("https://www.google.com")
-# #     print("ChromeDriver 설치 성공!")
-# #     driver.quit()
-# # except Exception as e:
-# #     print(f"ChromeDriver 설치 필요: {e}")
-
-# from selenium import webdriver
-# from selenium.webdriver.common.by import By
-# import time
-# import requests
-# from bs4 import BeautifulSoup
-# import json  # 결과 저장용
-
-# class PinterestScraper:
-#     def __init__(self):  # __init__ 정확한 문법 (언더바 2개씩)
-#         options = webdriver.ChromeOptions()
-#         options.add_argument('--headless')
-#         options.add_argument('--no-sandbox')
-#         options.add_argument('--disable-dev-shm-usage')  # 안정성 개선
-#         self.driver = webdriver.Chrome(options=options)
-        
-#     def search_pins(self, query, max_pins=50):  # 처음엔 50개로 테스트
-#         search_url = f"https://www.pinterest.com/search/pins/?q={query}"
-#         print(f"검색 시작: {search_url}")
-        
-#         self.driver.get(search_url)
-#         time.sleep(3)  # 페이지 로딩 대기
-        
-#         pins_data = []
-#         last_height = self.driver.execute_script("return document.body.scrollHeight")
-        
-#         while len(pins_data) < max_pins:
-#             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-#             time.sleep(2)
-            
-#             pin_elements = self.driver.find_elements(By.CSS_SELECTOR, '[data-test-id="pin"]')
-#             print(f"현재 찾은 핀 개수: {len(pin_elements)}")
-            
-#             for pin in pin_elements[len(pins_data):]:
-#                 try:
-#                     img_element = pin.find_element(By.TAG_NAME, "img")
-#                     img_url = img_element.get_attribute("src")
-#                     img_alt = img_element.get_attribute("alt")
-#                     pin_link = pin.find_element(By.TAG_NAME, "a").get_attribute("href")
-                    
-#                     pins_data.append({
-#                         "image_url": img_url,
-#                         "description": img_alt,
-#                         "pin_url": pin_link
-#                     })
-                    
-#                     print(f"수집됨 {len(pins_data)}: {img_alt[:50]}...")
-                    
-#                 except Exception as e:
-#                     continue
-                    
-#             new_height = self.driver.execute_script("return document.body.scrollHeight")
-#             if new_height == last_height:
-#                 print("더 이상 새로운 콘텐츠가 없습니다.")
-#                 break
-#             last_height = new_height
-            
-#         return pins_data[:max_pins]
-    
-#     def close(self):
-#         self.driver.quit()
-
-# # 실행 및 결과 확인
-# if __name__ == "__main__":  # __name__ 정확한 문법 (언더바 2개씩)
-#     scraper = PinterestScraper()
-#     try:
-#         # 남자 여름 패션으로 검색 (한국어)
-#         pins = scraper.search_pins("남자 여름 패션", 20)  # 처음엔 20개만
-        
-#         # 결과 출력
-#         print(f"\n총 {len(pins)}개의 핀을 수집했습니다!")
-        
-#         # JSON 파일로 저장
-#         with open("mens_summer_fashion_pins.json", "w", encoding="utf-8") as f:
-#             json.dump(pins, f, ensure_ascii=False, indent=2)
-        
-#         print("결과가 mens_summer_fashion_pins.json 파일에 저장되었습니다.")
-        
-#         # 처음 3개만 미리보기
-#         for i, pin in enumerate(pins[:3]):
-#             print(f"\n{i+1}. {pin['description']}")
-#             print(f"   이미지: {pin['image_url']}")
-#             print(f"   링크: {pin['pin_url']}")
-            
-#     except Exception as e:
-#         print(f"에러 발생: {e}")
-#     finally:
-#         scraper.close()
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 import time
@@ -103,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import random
+import os
 
 class ImprovedPinterestScraper:
     def __init__(self):
@@ -249,13 +152,42 @@ if __name__ == "__main__":
     scraper = ImprovedPinterestScraper()
     
     try:
-        # 다양한 검색어로 분산 수집
+        # 다양한 검색어로 분산 수집 (남성 전용)
         search_queries = [
-            "korean men summer fashion",      # 영어 기본
-            "men summer outfit korean",       # 영어 변형
-            "korean summer street style",     # 스트릿 스타일
-            "korean casual summer men",       # 캐주얼 강조
-            "men summer fashion seoul"        # 서울 패션
+            # "korean men summer fashion",      # 영어 기본
+            # "men summer outfit korean",       # 영어 변형
+            # "korean summer street style",     # 스트릿 스타일
+            # "korean casual summer men",       # 캐주얼 강조
+            # "men summer fashion seoul"        # 서울 패션
+            # "korean men summer style",        # 스타일 강조
+            # "men summer fashion korea",       # 한국 패션
+            # "korean summer men outfit",       # 아웃핏 강조
+            # "korean men casual summer",       # 캐주얼 여름
+            # "men summer street fashion korean", # 스트릿 패션
+            # "korean men summer looks",        # 룩 강조
+            # "men summer style korean fashion", # 패션 스타일
+            # "korean summer men clothing",     # 의류 강조
+            # "men summer outfit ideas korean", # 아웃핏 아이디어
+            # "korean men summer fashion trends", # 트렌드
+            # "men summer casual korean style", # 캐주얼 스타일
+            # "korean summer men streetwear",   # 스트릿웨어
+            # "men summer fashion inspiration korean", # 영감
+            # "korean men summer wardrobe",     # 워드로브
+            # "men summer style inspiration korean", # 스타일 영감
+            # "korean men summer fashion male", # 남성 명시
+            # "men summer outfit korean male",  # 남성 아웃핏
+            # "korean men summer clothing male", # 남성 의류
+            # "men summer style korean male",   # 남성 스타일
+            # "korean men summer fashion guy",  # 남성 패션
+            # "men summer outfit ideas korean male", # 남성 아이디어
+            # "korean men summer fashion boy",  # 남성 패션
+            # "men summer casual korean male",  # 남성 캐주얼
+            # "korean men summer street style male" # 남성 스트릿
+            "korean men summer fashion male", # 남성 명시
+            "men summer outfit korean male",  # 남성 아웃핏
+            "korean men summer clothing male", # 남성 의류
+            "men summer style korean male",   # 남성 스타일
+            "korean men summer fashion guy"   # 남성 패션
         ]
         
         print("=== 다중 검색어로 패션 이미지 수집 시작 ===")
@@ -263,10 +195,38 @@ if __name__ == "__main__":
         
         print(f"\n🎉 총 {len(all_pins)}개의 고유한 핀을 수집했습니다!")
         
-        # 결과를 JSON 파일로 저장
-        output_file = "improved_mens_summer_fashion.json"
+        # 결과를 JSON 파일로 저장 (기존 파일이 있으면 추가)
+        output_file = "korean_mens_summer_fashion_pinterest.json"
+        
+        # 기존 데이터 로드 (파일이 존재하는 경우)
+        existing_pins = []
+        if os.path.exists(output_file):
+            try:
+                with open(output_file, "r", encoding="utf-8") as f:
+                    existing_pins = json.load(f)
+                print(f"📁 기존 파일에서 {len(existing_pins)}개 데이터 로드됨")
+            except Exception as e:
+                print(f"⚠️ 기존 파일 읽기 실패: {e}")
+                existing_pins = []
+        
+        # 중복 제거를 위한 기존 URL 추출
+        existing_urls = set(pin['image_url'] for pin in existing_pins)
+        
+        # 새로운 데이터에서 중복 제거
+        new_unique_pins = []
+        for pin in all_pins:
+            if pin['image_url'] not in existing_urls:
+                new_unique_pins.append(pin)
+                existing_urls.add(pin['image_url'])
+        
+        # 기존 + 새로운 데이터 합치기
+        combined_pins = existing_pins + new_unique_pins
+        
+        # 파일에 저장
         with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(all_pins, f, ensure_ascii=False, indent=2)
+            json.dump(combined_pins, f, ensure_ascii=False, indent=2)
+        
+        print(f"✅ {len(new_unique_pins)}개 새로운 데이터 추가됨 (총 {len(combined_pins)}개)")
         
         print(f"결과가 {output_file} 파일에 저장되었습니다.")
         

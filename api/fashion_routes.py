@@ -72,16 +72,18 @@ def analyze_situations_from_outfit(extracted_items: dict) -> list:
     tuck_degree = styling_methods.get("tuck_degree", "").lower()
     fit_details = styling_methods.get("fit_details", "").lower()
     
+
+    
     # 상황별 판단 로직
     # 소개팅/데이트
-    if any(keyword in top_item for keyword in ["셔츠", "블라우스"]) and \
+    if any(keyword in top_item for keyword in ["셔츠", "블라우스", "블레이저"]) and \
        any(keyword in bottom_item for keyword in ["슬랙스", "팬츠"]) and \
        any(keyword in shoes_item for keyword in ["로퍼", "옥스포드", "힐"]):
         situations.append("소개팅")
         situations.append("데이트")
     
     # 면접/비즈니스
-    if any(keyword in top_item for keyword in ["셔츠", "블라우스"]) and \
+    if any(keyword in top_item for keyword in ["셔츠", "블라우스", "블레이저"]) and \
        any(keyword in bottom_item for keyword in ["슬랙스"]) and \
        any(keyword in shoes_item for keyword in ["로퍼", "옥스포드", "펌프스"]) and \
        ("넣" in tuck_degree or "정돈" in fit_details):
@@ -265,12 +267,17 @@ def calculate_match_score(user_input: str, json_content: dict, expert_type: str)
                 if item_fit and item_fit in user_input_lower:
                     score += 0.2
         
-        # 스타일링 방법 매칭
+        # 스타일링 방법 매칭 (다양한 스타일링 포인트 포함)
         styling_methods = extracted_items.get('styling_methods', {})
         if isinstance(styling_methods, dict):
             for method_key, method_value in styling_methods.items():
                 if isinstance(method_value, str) and method_value.lower() in user_input_lower:
-                    score += 0.2
+                    # 주요 스타일링 (더 높은 가중치)
+                    if method_key in ['top_wearing_method', 'tuck_degree', 'fit_details', 'silhouette_balance']:
+                        score += 0.3
+                    # 세부 스타일링 (일반 가중치)
+                    else:
+                        score += 0.2
         
         # 전문가 타입별 가중치
         if expert_type == "stylist":
@@ -314,10 +321,18 @@ def calculate_diversity_bonus(situations: list, extracted_items: dict) -> float:
         elif filled_categories >= 3:
             bonus += 0.03  # 3개 카테고리 채워짐
         
-        # 스타일링 방법 다양성 보너스
+        # 스타일링 방법 다양성 보너스 (새로운 필드들 포함)
         styling_methods = extracted_items.get('styling_methods', {})
-        if isinstance(styling_methods, dict) and len(styling_methods) >= 3:
-            bonus += 0.02  # 3개 이상의 스타일링 방법
+        if isinstance(styling_methods, dict):
+            filled_styling_methods = 0
+            for key, value in styling_methods.items():
+                if isinstance(value, str) and value.strip():
+                    filled_styling_methods += 1
+            
+            if filled_styling_methods >= 5:
+                bonus += 0.03  # 5개 이상의 스타일링 방법
+            elif filled_styling_methods >= 3:
+                bonus += 0.02  # 3개 이상의 스타일링 방법
         
         return bonus
         
@@ -656,8 +671,18 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
         extracted_items = content.get('extracted_items', {})
         situations = content.get('situations', [])
         
-        # 간결한 응답 생성
-        response = generate_concise_response(extracted_items, situations, request.expert_type.value, selected_match['s3_url'])
+        # JSON 데이터를 전문가 서비스로 전달하여 자연스러운 답변 생성
+        expert_service = get_fashion_expert_service()
+        if expert_service:
+            # JSON 데이터를 request에 추가
+            request.json_data = extracted_items
+            expert_result = await expert_service.get_single_expert_analysis(request)
+            response = expert_result['analysis']
+            print(f"✅ JSON 기반 전문가 분석 완료: {expert_result['expert_type']}")
+        else:
+            # 전문가 서비스가 없으면 기존 방식 사용
+            response = generate_concise_response(extracted_items, situations, request.expert_type.value, selected_match['s3_url'])
+            print("⚠️ 전문가 서비스 없음, 기존 방식 사용")
         
         # Redis에 분석 결과 추가
         analysis_content = f"[{request.expert_type.value}] S3 매칭 결과: {selected_match['filename']}"
@@ -738,36 +763,96 @@ def generate_concise_response(extracted_items: dict, situations: list, expert_ty
         
         # 아이템 정보
         items_info = []
-        for category, item_info in extracted_items.items():
-            if isinstance(item_info, dict) and item_info.get('item'):
-                item_name = item_info.get('item', '')
-                item_color = item_info.get('color', '')
-                item_fit = item_info.get('fit', '')
-                
-                item_desc = item_name
-                if item_color:
-                    item_desc += f" ({item_color})"
-                if item_fit:
-                    item_desc += f" - {item_fit}"
-                
-                items_info.append(f"• {category.title()}: {item_desc}")
+        
+        # 상의
+        top = extracted_items.get('top', {})
+        if isinstance(top, dict) and top.get('item'):
+            item_name = top.get('item', '')
+            item_color = top.get('color', '')
+            item_fit = top.get('fit', '')
+            
+            item_desc = item_name
+            if item_color:
+                item_desc += f" ({item_color})"
+            if item_fit:
+                item_desc += f" - {item_fit}"
+            
+            items_info.append(f"• 상의: {item_desc}")
+        
+        # 하의
+        bottom = extracted_items.get('bottom', {})
+        if isinstance(bottom, dict) and bottom.get('item'):
+            item_name = bottom.get('item', '')
+            item_color = bottom.get('color', '')
+            item_fit = bottom.get('fit', '')
+            
+            item_desc = item_name
+            if item_color:
+                item_desc += f" ({item_color})"
+            if item_fit:
+                item_desc += f" - {item_fit}"
+            
+            items_info.append(f"• 하의: {item_desc}")
+        
+        # 신발
+        shoes = extracted_items.get('shoes', {})
+        if isinstance(shoes, dict) and shoes.get('item'):
+            item_name = shoes.get('item', '')
+            item_color = shoes.get('color', '')
+            
+            item_desc = item_name
+            if item_color:
+                item_desc += f" ({item_color})"
+            
+            items_info.append(f"• 신발: {item_desc}")
         
         if items_info:
             response_parts.append(f"👕 **착장 구성**:\n" + "\n".join(items_info))
+        
+
         
         # 스타일링 방법 (스타일리스트인 경우 강조)
         styling_methods = extracted_items.get('styling_methods', {})
         if styling_methods and isinstance(styling_methods, dict):
             styling_info = []
+            
+            # 주요 스타일링 포인트들을 카테고리별로 정리
+            main_styling = []
+            detail_styling = []
+            
             for key, value in styling_methods.items():
                 if isinstance(value, str) and value:
-                    styling_info.append(f"• {value}")
+                    # 전문 용어를 쉬운 말로 변환
+                    easy_value = value
+                    
+                    # 프렌치턱, 하프턱 등의 전문 용어를 쉬운 말로 변경
+                    easy_value = easy_value.replace("프렌치턱", "앞부분만 살짝 넣기")
+                    easy_value = easy_value.replace("하프턱", "앞부분만 넣기")
+                    easy_value = easy_value.replace("오버핏", "여유있게")
+                    easy_value = easy_value.replace("레귤러핏", "딱 맞게")
+                    easy_value = easy_value.replace("슬림핏", "타이트하게")
+                    easy_value = easy_value.replace("크로스 스타일", "단추 교차 스타일")
+                    
+                    # 주요 스타일링 (상의 착용법, 핏감, 실루엣)
+                    if key in ['top_wearing_method', 'tuck_degree', 'fit_details', 'silhouette_balance']:
+                        main_styling.append(f"• {easy_value}")
+                    # 세부 스타일링 (소매, 단추, 액세서리 등)
+                    elif key in ['cuff_style', 'button_style', 'accessory_placement', 'pocket_usage', 'belt_style']:
+                        detail_styling.append(f"• {easy_value}")
+                    # 기타 스타일링 포인트
+                    else:
+                        detail_styling.append(f"• {easy_value}")
             
-            if styling_info:
+            # 주요 스타일링 표시
+            if main_styling:
                 if expert_type == "stylist":
-                    response_parts.append(f"💡 **스타일링 포인트**:\n" + "\n".join(styling_info))
+                    response_parts.append(f"💡 **주요 스타일링**:\n" + "\n".join(main_styling))
                 else:
-                    response_parts.append(f"✨ **스타일링**:\n" + "\n".join(styling_info))
+                    response_parts.append(f"✨ **스타일링**:\n" + "\n".join(main_styling))
+            
+            # 세부 스타일링 표시 (스타일리스트인 경우에만)
+            if detail_styling and expert_type == "stylist":
+                response_parts.append(f"🎯 **세부 포인트**:\n" + "\n".join(detail_styling))
         
         # 전문가별 추가 조언
         if expert_type == "stylist":
@@ -1315,6 +1400,67 @@ async def update_situations(filename: str, request: SituationsUpdateRequest):
         print(f"❌ Situations 업데이트 실패: {str(e)}")
         logger.error(f"Situations 업데이트 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Situations 업데이트 실패: {str(e)}")
+
+@router.delete("/admin/delete-outfit/{filename}")
+async def delete_outfit(filename: str):
+    """특정 아웃핏의 이미지와 JSON 파일을 S3에서 삭제"""
+    
+    print(f"🔍 delete_outfit 호출됨: {filename}")
+    print(f"🔍 s3_service 상태: {s3_service is not None}")
+    
+    if s3_service is None:
+        raise HTTPException(
+            status_code=500, 
+            detail="S3 서비스가 초기화되지 않았습니다."
+        )
+    
+    try:
+        # JSON 파일 내용 가져오기 (이미지 URL 확인용)
+        json_content = s3_service.get_json_content(filename)
+        image_url = json_content.get('source_image_url', '')
+        
+        deleted_files = []
+        
+        # 1. JSON 파일 삭제
+        json_key = f"{s3_service.bucket_json_prefix}/{filename}.json"
+        try:
+            s3_service.s3_client.delete_object(
+                Bucket=s3_service.bucket_name,
+                Key=json_key
+            )
+            deleted_files.append(f"JSON: {json_key}")
+            print(f"✅ JSON 파일 삭제 완료: {json_key}")
+        except Exception as e:
+            print(f"⚠️ JSON 파일 삭제 실패: {e}")
+        
+        # 2. 이미지 파일 삭제 (URL에서 키 추출)
+        if image_url:
+            try:
+                # URL에서 S3 키 추출
+                image_key = image_url.replace(f"https://{s3_service.bucket_name}.s3.{settings.AWS_REGION}.amazonaws.com/", "")
+                s3_service.s3_client.delete_object(
+                    Bucket=s3_service.bucket_name,
+                    Key=image_key
+                )
+                deleted_files.append(f"Image: {image_key}")
+                print(f"✅ 이미지 파일 삭제 완료: {image_key}")
+            except Exception as e:
+                print(f"⚠️ 이미지 파일 삭제 실패: {e}")
+        
+        return ResponseModel(
+            success=True,
+            message=f"아웃핏 파일들이 삭제되었습니다.",
+            data={
+                "filename": filename,
+                "deleted_files": deleted_files,
+                "image_url": image_url
+            }
+        )
+        
+    except Exception as e:
+        print(f"❌ 아웃핏 삭제 실패: {str(e)}")
+        logger.error(f"아웃핏 삭제 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"삭제 실패: {str(e)}")
 
 # ✅ 이미지 분석 API (파일 업로드 기반 - 기존 방식 유지)
 @router.post("/vision/analyze-outfit-upload")
