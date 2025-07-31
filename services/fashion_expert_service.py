@@ -941,11 +941,11 @@ class SimpleFashionExpertService:
         
         expert_responses = {
             FashionExpertType.STYLE_ANALYST: [
-                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 나쁘지 않아. {styling_info.get('styling_points', '')} 포인트 괜찮아.",
-                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 체형에 적당해. {styling_info.get('fit_details', '')} 날씬해 보일 거야.",
-                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮네. {styling_info.get('fit_details', '')} 체형이 좀 보완될 거야.",
-                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 나쁘지 않아. {styling_info.get('tuck_degree', '')} 스타일링 깔끔해.",
-                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 핏 괜찮아. {top_info.get('fit', '')} 체형을 보완해줘."
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 추천해. {styling_info.get('styling_points', '')} 포인트 괜찮아.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 좋을 것 같아. {styling_info.get('fit_details', '')} 덕분에 날씬해 보일 거야.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 괜찮네. {styling_info.get('fit_details', '')} 때문에 체형이 좀 보완될 거야.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 나쁘지 않아. {styling_info.get('tuck_degree', '')} 스타일링이 깔끔해.",
+                f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 핏 괜찮아. {top_info.get('fit', '')} 때문에 체형을 보완해줘."
             ],
             FashionExpertType.TREND_EXPERT: [
                 f"{top_info.get('fit', '')} {top_info.get('color', '')} {top_info.get('item', '')} + {bottom_info.get('fit', '')} {bottom_info.get('color', '')} {bottom_info.get('item', '')} 조합 요즘 유행이야. {styling_info.get('silhouette_balance', '')} 괜찮아.",
@@ -1064,6 +1064,14 @@ class SimpleFashionExpertService:
                     improved_sentences.append(sentence)
             
             response = '. '.join(improved_sentences)
+        
+        # 중복 핏 정보 제거 (예: "오버핏 블랙 반팔 오버핏 티셔츠" → "오버핏 블랙 반팔 티셔츠")
+        fit_terms = ['오버핏', '슬림핏', '레귤러핏', '와이드핏', '세미오버핏']
+        for fit_term in fit_terms:
+            # 같은 핏이 두 번 나오는 경우 첫 번째만 유지
+            if f"{fit_term} " in response and f" {fit_term} " in response:
+                # 첫 번째 핏 정보는 유지하고, 아이템명 앞의 중복 핏 제거
+                response = response.replace(f" {fit_term} ", " ")
         
         # 소개팅/데이트/비즈니스에서 튀는 액세서리 제거
         if is_formal_occasion:
