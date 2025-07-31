@@ -629,49 +629,24 @@ class SimpleFashionExpertService:
                         combo = actual_combos[0]
                         # print(f"⚠️ 전문가별 선택 실패, 첫 번째 조합 사용: '{combo['combination']}'")
                 
-                # JSON 데이터 기반 자연스러운 답변 생성
-                if expert_type == FashionExpertType.STYLE_ANALYST:
-                    response_parts.append(f"체형을 보니 {combo['combination']}이 핏감과 실루엣에 잘 어울려.")
-                elif expert_type == FashionExpertType.TREND_EXPERT:
-                    response_parts.append(f"요즘 트렌드를 보면 {combo['combination']}이 인기 있어.")
-                elif expert_type == FashionExpertType.COLOR_EXPERT:
-                    response_parts.append(f"색상 조합으로 보면 {combo['combination']}이 퍼스널 컬러랑 잘 어울릴 것 같아.")
-                elif expert_type == FashionExpertType.FITTING_COORDINATOR:
-                    response_parts.append(f"전체적으로 {combo['combination']}이 균형감이 좋은 조합이에.")
-                else:
-                    response_parts.append(f"{template['prefix']} {combo['combination']}이 {template['focus']}에 잘 어울릴 것 같아.")
-                
-                # items가 리스트인지 확인하고 안전하게 처리
-                if isinstance(combo['items'], list):
-                    # 각 아이템별 상세 정보 추가
-                    detailed_items = []
-                    for item_name in combo['items']:
-                        # JSON 데이터에서 상세 정보 찾기
-                        item_details = self._get_item_details(item_name)
-                        if item_details:
-                            detailed_item = self._format_item_with_details(item_name, item_details)
-                            detailed_items.append(detailed_item)
-                        else:
-                            # JSON에서 못 찾으면 기본 형태로
-                            detailed_items.append(item_name)
-                    items_str = ', '.join(detailed_items)
-                else:
-                    items_str = str(combo['items'])
-                
-                response_parts.append(f"구체적으로는 {items_str} 조합을 추천해.")
-                
-                # 추가 정보 제공 (JSON 데이터 활용)
-                if combo.get('occasion'):
-                    response_parts.append(f"이 조합은 {combo['occasion']}에 특히 어울려.")
-                
-                # 각 아이템별 논리적 근거 설명
-                if isinstance(combo['items'], list) and combo['items']:
-                    response_parts.append("")
-                    # 여름 컬러 팁 추가
-                    response_parts.append(f"🎨 베이지나 화이트 톤으로 통일하면 여름다워!")
-                
-                print(f"✅ 아웃핏 조합 기반 응답 생성: {combo['combination']}")
-                print(f"📋 사용된 JSON 데이터: {combo}")
+                # LLM 기반 자연스러운 답변 생성
+                try:
+                    llm_response = await self._generate_llm_based_response(user_input, expert_type, combo)
+                    response_parts.append(llm_response)
+                    print(f"✅ LLM 기반 응답 생성: {combo['combination']}")
+                except Exception as e:
+                    print(f"LLM 응답 생성 실패, 템플릿 사용: {e}")
+                    # LLM 실패 시 기본 템플릿 사용
+                    if expert_type == FashionExpertType.STYLE_ANALYST:
+                        response_parts.append(f"체형을 보니 {combo['combination']}이 핏감과 실루엣에 잘 어울려.")
+                    elif expert_type == FashionExpertType.TREND_EXPERT:
+                        response_parts.append(f"요즘 트렌드를 보면 {combo['combination']}이 인기 있어.")
+                    elif expert_type == FashionExpertType.COLOR_EXPERT:
+                        response_parts.append(f"색상 조합으로 보면 {combo['combination']}이 퍼스널 컬러랑 잘 어울릴 것 같아.")
+                    elif expert_type == FashionExpertType.FITTING_COORDINATOR:
+                        response_parts.append(f"전체적으로 {combo['combination']}이 균형감이 좋은 조합이에.")
+                    else:
+                        response_parts.append(f"{template['prefix']} {combo['combination']}이 {template['focus']}에 잘 어울릴 것 같아.")
             
             # 2. 실제 컬러 추천이 있으면 추가 (아웃핏 조합이 없을 때만)
             elif actual_colors:
@@ -1020,6 +995,85 @@ class SimpleFashionExpertService:
         
         return response
 
+    async def _generate_llm_based_response(self, user_input: str, expert_type: FashionExpertType, combo_data: dict) -> str:
+        """LLM을 사용한 자연스러운 패션 추천 응답 생성"""
+        
+        expert_profiles = {
+            FashionExpertType.STYLE_ANALYST: {
+                "role": "스타일 분석가",
+                "focus": "핏감과 체형 보완",
+                "style": "핏감 중심의 깔끔한 스타일"
+            },
+            FashionExpertType.TREND_EXPERT: {
+                "role": "트렌드 전문가", 
+                "focus": "최신 트렌드와 인기 스타일",
+                "style": "트렌디하고 세련된 스타일"
+            },
+            FashionExpertType.COLOR_EXPERT: {
+                "role": "컬러 전문가",
+                "focus": "색상 조합과 톤",
+                "style": "색상 조합이 완벽한 스타일"
+            },
+            FashionExpertType.FITTING_COORDINATOR: {
+                "role": "핏팅 코디네이터",
+                "focus": "전체적인 균형과 실루엣",
+                "style": "균형잡힌 완벽한 스타일"
+            }
+        }
+        
+        expert_info = expert_profiles.get(expert_type, expert_profiles[FashionExpertType.STYLE_ANALYST])
+        
+        # 조합 정보 추출
+        items = combo_data.get('items', [])
+        combination = combo_data.get('combination', '')
+        occasion = combo_data.get('occasion', '')
+        
+        # 상의, 하의, 신발 정보 분리
+        top_item = ""
+        bottom_item = ""
+        shoes_item = ""
+        
+        for item in items:
+            if any(keyword in item.lower() for keyword in ['셔츠', '니트', '블라우스', '티셔츠', '맨투맨', '후드']):
+                top_item = item
+            elif any(keyword in item.lower() for keyword in ['슬랙스', '팬츠', '청바지', '와이드']):
+                bottom_item = item
+            elif any(keyword in item.lower() for keyword in ['로퍼', '스니커', '부츠', '신발', '슈즈']):
+                shoes_item = item
+        
+        system_prompt = f"""당신은 {expert_info['role']}입니다. {expert_info['focus']}에 특화되어 있으며, {expert_info['style']}을 추천합니다.
+
+다음 규칙을 따라 자연스럽고 친근한 톤으로 패션 추천을 해주세요:
+
+1. 핏 정보를 첫 줄에 명시: "슬림핏", "오버핏", "레귤러핏" 등
+2. 조합을 먼저 언급하고, 그 다음에 분석이나 이유를 설명
+3. 전문 용어 대신 일반인이 이해하기 쉬운 표현 사용
+4. 긍정적이고 추천하는 톤으로 응답
+5. 신발도 자연스럽게 포함
+6. 소개팅/데이트/비즈니스 상황에서는 셔츠/니트 등 정장 아이템 우선
+7. 화이트+화이트 조합은 피하기
+8. 반드시 완전한 반말(해, 야, 네) 사용 - 존댓말(해요, 합니다, 입니다) 절대 사용 금지
+
+예시 형식:
+"슬림핏 화이트 반팔 셔츠 + 와이드핏 베이지 슬랙스 조합이 체형에 잘 맞아. 셔츠의 깔끔한 라인이 날씬해 보이게 해주고, 베이지 컬러가 포인트가 되네. 브라운 로퍼도 함께 착용하면 완벽한 조합이 될 거야."
+
+조합 정보: {combination}
+상의: {top_item}
+하의: {bottom_item}
+신발: {shoes_item}
+상황: {occasion}
+사용자 요청: {user_input}"""
+
+        user_prompt = f"위 정보를 바탕으로 {expert_info['role']} 관점에서 자연스럽고 친근한 톤으로 패션 추천을 해주세요."
+
+        try:
+            response = await self._call_openai_async(system_prompt, user_prompt)
+            return response
+        except Exception as e:
+            print(f"LLM 응답 생성 실패: {e}")
+            # LLM 실패 시 기존 템플릿 사용
+            return await self._generate_json_based_response(user_input, expert_type, combo_data)
+
     def _improve_response_for_occasion(self, response: str, user_input: str) -> str:
         """상황별 필터링 및 용어 개선"""
         # 소개팅/데이트/비즈니스 상황 체크
@@ -1174,20 +1228,6 @@ class SimpleFashionExpertService:
         return response
     
     def _call_openai_sync(self, system_prompt: str, user_prompt: str) -> str:
-        # """동기 OpenAI 호출"""
-        # response = self.client.chat.completions.create(
-        #     model=settings.LLM_MODEL_NAME,
-        #     messages=[
-        #         {"role": "system", "content": system_prompt},
-        #         {"role": "user", "content": user_prompt}
-        #     ],
-        #     max_tokens=settings.LLM_MAX_TOKENS,
-        #     temperature=settings.LLM_TEMPERATURE
-        # )
-        # content = response.choices[0].message.content
-        # if content is None:
-        #     return "응답을 생성할 수 없습니다."
-        # return content 
         """Claude API 호출로 변경"""
         response = self.client.messages.create(
             model=settings.LLM_MODEL_NAME,
