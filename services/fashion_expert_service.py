@@ -925,19 +925,46 @@ class SimpleFashionExpertService:
         response_pool = expert_responses.get(expert_type, expert_responses[FashionExpertType.STYLE_ANALYST])
         response = random.choice(response_pool)
         
-        # 추가 정보 (신발, 액세서리 등) - 신발은 항상 추천 (기호 사용)
+        # 추가 정보 (신발, 액세서리 등) - 신발은 항상 추천 (구어체 사용)
         if shoes_info.get("item"):
             # 색상 중복 방지
             shoe_color = shoes_info.get('color', '')
             shoe_item = shoes_info.get('item', '')
+            
+            # 전문가별 다른 신발 추천 표현
+            shoe_expressions = {
+                FashionExpertType.STYLE_ANALYST: [
+                    f" {shoe_color} {shoe_item}도 추가하면 완벽해.",
+                    f" {shoe_color} {shoe_item}도 함께 착용하면 좋겠어.",
+                    f" {shoe_color} {shoe_item}도 어울릴 것 같아."
+                ],
+                FashionExpertType.TREND_EXPERT: [
+                    f" {shoe_color} {shoe_item}도 요즘 핫해.",
+                    f" {shoe_color} {shoe_item}도 트렌디해.",
+                    f" {shoe_color} {shoe_item}도 인스타에서 자주 보여."
+                ],
+                FashionExpertType.COLOR_EXPERT: [
+                    f" {shoe_color} {shoe_item}도 색상이 잘 맞아.",
+                    f" {shoe_color} {shoe_item}도 컬러 조합이 괜찮아.",
+                    f" {shoe_color} {shoe_item}도 톤이 잘 어울려."
+                ],
+                FashionExpertType.FITTING_COORDINATOR: [
+                    f" {shoe_color} {shoe_item}도 균형감이 좋아.",
+                    f" {shoe_color} {shoe_item}도 실루엣이 잘 맞아.",
+                    f" {shoe_color} {shoe_item}도 전체적으로 조화로워."
+                ]
+            }
+            
+            # 해당 전문가의 신발 표현 중 랜덤 선택
+            expert_shoe_expressions = shoe_expressions.get(expert_type, shoe_expressions[FashionExpertType.STYLE_ANALYST])
+            shoe_expression = random.choice(expert_shoe_expressions)
+            
+            # 색상이 이미 아이템명에 포함되어 있으면 색상 생략
             if shoe_color and shoe_item:
-                # 색상이 이미 아이템명에 포함되어 있으면 색상 생략
                 if shoe_color.lower() in shoe_item.lower():
-                    response += f" + {shoe_item}"
-                else:
-                    response += f" + {shoe_color} {shoe_item}"
-            else:
-                response += f" + {shoe_item}"
+                    shoe_expression = shoe_expression.replace(f"{shoe_color} {shoe_item}", shoe_item)
+            
+            response += shoe_expression
         
         return response
 
