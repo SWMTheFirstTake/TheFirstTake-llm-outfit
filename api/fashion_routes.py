@@ -269,6 +269,15 @@ def calculate_match_score(user_input: str, json_content: dict, expert_type: str)
         if top_color == "화이트" and bottom_color == "화이트":
             score -= 0.4  # 화이트+화이트 조합은 40% 감점 (단조로움)
         
+        # 소개팅/비즈니스 상황에 부적절한 아이템 체크 및 감점
+        formal_inappropriate_items = ["그래픽", "오버사이즈", "와이드", "맨투맨", "후드티", "크롭", "티셔츠"]
+        formal_keywords = ["소개팅", "데이트", "면접", "출근", "비즈니스", "회사", "미팅", "회의", "오피스"]
+        is_formal_occasion = any(keyword in user_input_lower for keyword in formal_keywords)
+        
+        if is_formal_occasion:
+            if any(item in top_item for item in formal_inappropriate_items):
+                score -= 0.5  # 소개팅/비즈니스에 부적절한 아이템은 50% 감점
+        
         # 상황 태그 매칭 (가중치 높음)
         situation_matched = False
         for situation in situations:

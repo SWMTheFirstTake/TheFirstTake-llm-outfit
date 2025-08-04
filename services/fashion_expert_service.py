@@ -1188,7 +1188,7 @@ class SimpleFashionExpertService:
         return response
 
     def _filter_for_formal_occasion(self, response: str, json_data: dict, user_input: str) -> str:
-        """소개팅/비즈니스 상황에서는 티셔츠 대신 정장적인 아이템 추천"""
+        """소개팅/비즈니스 상황에서는 캐주얼한 아이템을 정장적인 아이템으로 교체"""
         # 소개팅/비즈니스 상황 체크
         formal_keywords = ["소개팅", "데이트", "면접", "출근", "비즈니스", "회사", "미팅", "회의", "오피스"]
         is_formal_occasion = any(keyword in user_input.lower() for keyword in formal_keywords)
@@ -1199,17 +1199,38 @@ class SimpleFashionExpertService:
         # JSON 데이터에서 아이템 확인
         top_item = json_data.get("top", {}).get("item", "").lower()
         
-        # 티셔츠를 정장적인 아이템으로 교체
-        if "티셔츠" in top_item:
-            formal_alternatives = ["반팔 셔츠", "반팔 블라우스", "반팔 폴로", "반팔 니트"]
-            import random
-            new_item = random.choice(formal_alternatives)
-            
-            # 응답에서 아이템 교체
-            response = response.replace("티셔츠", new_item.split()[-1])  # "티셔츠" 부분만 교체
-            
-            # 교체 이유 설명 추가
-            response += f" 소개팅에는 {new_item}가 더 적합해!"
+        # 캐주얼한 아이템들을 정장적인 아이템으로 교체
+        casual_to_formal = {
+            "티셔츠": ["반팔 셔츠", "반팔 블라우스", "반팔 폴로", "반팔 니트"],
+            "그래픽": ["단색", "스트라이프", "체크"],
+            "오버사이즈": ["레귤러핏", "슬림핏"],
+            "와이드": ["레귤러핏", "슬림핏"],
+            "맨투맨": ["반팔 셔츠", "반팔 블라우스"],
+            "후드티": ["반팔 셔츠", "반팔 블라우스"],
+            "크롭": ["반팔 셔츠", "반팔 블라우스"]
+        }
+        
+        # 캐주얼한 아이템이 있으면 정장적인 아이템으로 교체
+        for casual_item, formal_alternatives in casual_to_formal.items():
+            if casual_item in top_item:
+                import random
+                new_item = random.choice(formal_alternatives)
+                
+                # 응답에서 아이템 교체
+                if casual_item == "그래픽":
+                    response = response.replace("그래픽", new_item)
+                elif casual_item == "오버사이즈":
+                    response = response.replace("오버사이즈", new_item)
+                elif casual_item == "와이드":
+                    response = response.replace("와이드", new_item)
+                elif casual_item == "티셔츠":
+                    response = response.replace("티셔츠", new_item.split()[-1])
+                elif casual_item in ["맨투맨", "후드티", "크롭"]:
+                    response = response.replace(casual_item, new_item.split()[-1])
+                
+                # 교체 이유 설명 추가
+                response += f" 소개팅에는 {new_item}가 더 적합해!"
+                break  # 첫 번째 매칭되는 아이템만 교체
         
         return response
 
