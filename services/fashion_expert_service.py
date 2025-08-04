@@ -986,8 +986,8 @@ class SimpleFashionExpertService:
                 bottom_item = "슬랙스"   # 소개팅/비즈니스에는 슬랙스
                 shoes_item = "로퍼"      # 소개팅/비즈니스에는 로퍼
                 styling_methods = {
-                    "top_wearing_method": "앞부분만 살짝 넣기",
-                    "tuck_degree": "앞부분만 넣기",
+                    "top_wearing_method": "살짝 넣기",
+                    "tuck_degree": "살짝 넣기",
                     "fit_details": "깔끔하고 정돈된 핏",
                     "silhouette_balance": "비즈니스에 적합한 실루엣",
                     "styling_points": "단추 위쪽 1-2개 해제, 소매 롤업"
@@ -998,7 +998,7 @@ class SimpleFashionExpertService:
                 shoes_item = "스니커즈"   # 캐주얼에는 스니커즈
                 styling_methods = {
                     "top_wearing_method": "자연스럽게 내려놓기",
-                    "tuck_degree": "넣지 않기",
+                    "tuck_degree": "자유롭게 내려놓기",
                     "fit_details": "시원하고 가벼운 핏",
                     "silhouette_balance": "여름에 적합한 짧은 실루엣",
                     "styling_points": "시원한 소재, 가벼운 느낌"
@@ -1064,7 +1064,14 @@ class SimpleFashionExpertService:
                 styling_tips.append(f"상의는 {styling_info['top_wearing_method']}")
             
             if styling_info.get("tuck_degree"):
-                styling_tips.append(f"바지는 {styling_info['tuck_degree']}")
+                # tuck_degree를 더 자연스럽게 표현
+                tuck_style = styling_info['tuck_degree']
+                if "살짝 넣기" in tuck_style:
+                    styling_tips.append("상의는 살짝 넣기")
+                elif "자유롭게" in tuck_style:
+                    styling_tips.append("상의는 자연스럽게 내려놓기")
+                else:
+                    styling_tips.append(f"상의는 {tuck_style}")
             
             if styling_info.get("styling_points"):
                 styling_tips.append(f"{styling_info['styling_points']}")
