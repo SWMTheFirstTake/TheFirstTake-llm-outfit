@@ -182,16 +182,21 @@ if __name__ == "__main__":
             # "men summer outfit ideas korean male", # 남성 아이디어
             # "korean men summer fashion boy",  # 남성 패션
             # "men summer casual korean male",  # 남성 캐주얼
-            # "korean men summer street style male" # 남성 스트릿
-            "korean men summer fashion male", # 남성 명시
-            "men summer outfit korean male",  # 남성 아웃핏
-            "korean men summer clothing male", # 남성 의류
-            "men summer style korean male",   # 남성 스타일
-            "korean men summer fashion guy"   # 남성 패션
+            # "korean men summer street style male", # 남성 스트릿
+            # "korean men summer fashion male", # 남성 명시
+            # "men summer outfit korean male",  # 남성 아웃핏
+            # "korean men summer clothing male", # 남성 의류
+            # "men summer style korean male",   # 남성 스타일
+            # "korean men summer fashion guy",   # 남성 패션
+            "korea summer street style",        # 한국 여름 스트릿
+            "korea summer business casual",     # 한국 여름 비즈니스 캐주얼
+            "korea summer streetwear",          # 한국 여름 스트릿웨어
+            "korea summer casual style",        # 한국 여름 캐주얼
+            "korea summer fashion trends"       # 한국 여름 패션 트렌드
         ]
         
         print("=== 다중 검색어로 패션 이미지 수집 시작 ===")
-        all_pins = scraper.multi_query_search(search_queries, pins_per_query=20)
+        all_pins = scraper.multi_query_search(search_queries, pins_per_query=30)
         
         print(f"\n🎉 총 {len(all_pins)}개의 고유한 핀을 수집했습니다!")
         

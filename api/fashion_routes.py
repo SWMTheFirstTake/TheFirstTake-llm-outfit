@@ -50,7 +50,7 @@ def get_fashion_expert_service():
     return expert_service
 
 def analyze_situations_from_outfit(extracted_items: dict) -> list:
-    """착장 분석을 통해 적합한 상황 태그 추출"""
+    """착장 분석을 통해 적합한 상황 태그 추출 (여름 시즌 고려)"""
     situations = []
     
     # 상의 분석
@@ -71,6 +71,14 @@ def analyze_situations_from_outfit(extracted_items: dict) -> list:
     styling_methods = extracted_items.get("styling_methods", {})
     tuck_degree = styling_methods.get("tuck_degree", "").lower()
     fit_details = styling_methods.get("fit_details", "").lower()
+    
+    # 여름 시즌 체크 (현재 여름이므로 여름에 적합한 착장만 고려)
+    summer_appropriate = True
+    summer_inappropriate_items = ["긴팔", "롱슬리브", "긴바지", "롱팬츠", "롱스커트", "맥시스커트", "코트", "패딩", "니트", "스웨터"]
+    
+    if any(item in top_item for item in summer_inappropriate_items) or \
+       any(item in bottom_item for item in summer_inappropriate_items):
+        summer_appropriate = False
     
 
     
@@ -110,6 +118,10 @@ def analyze_situations_from_outfit(extracted_items: dict) -> list:
        any(keyword in shoes_item for keyword in ["힐", "샌들"]):
         situations.append("파티")
         situations.append("이벤트")
+    
+    # 여름 시즌에 적합하지 않은 착장은 제외
+    if not summer_appropriate:
+        situations = ["여름에 부적합"]
     
     # 중복 제거
     situations = list(set(situations))
@@ -224,7 +236,7 @@ def find_matching_outfits_from_s3(user_input: str, expert_type: str) -> dict:
         return None
 
 def calculate_match_score(user_input: str, json_content: dict, expert_type: str) -> float:
-    """사용자 입력과 JSON 내용의 매칭 점수 계산 (다양성 개선)"""
+    """사용자 입력과 JSON 내용의 매칭 점수 계산 (여름 시즌 고려)"""
     score = 0.0
     
     try:
@@ -234,6 +246,28 @@ def calculate_match_score(user_input: str, json_content: dict, expert_type: str)
         # JSON에서 추출된 아이템들
         extracted_items = json_content.get('extracted_items', {})
         situations = json_content.get('situations', [])
+        
+        # 여름 시즌 체크 - 여름에 부적합한 착장은 점수 감점
+        summer_inappropriate_items = ["긴팔", "롱슬리브", "긴바지", "롱팬츠", "롱스커트", "맥시스커트", "코트", "패딩", "니트", "스웨터"]
+        top_item = extracted_items.get("top", {}).get("item", "").lower()
+        bottom_item = extracted_items.get("bottom", {}).get("item", "").lower()
+        
+        # 여름에 부적합한 아이템이 있으면 점수 감점
+        if any(item in top_item for item in summer_inappropriate_items) or \
+           any(item in bottom_item for item in summer_inappropriate_items):
+            score -= 0.3  # 여름에 부적합한 착장은 30% 감점
+        
+        # 여름에 적합한 아이템이 있으면 점수 가산
+        summer_appropriate_items = ["반팔", "반바지", "티셔츠", "탑"]
+        if any(item in top_item for item in summer_appropriate_items) or \
+           any(item in bottom_item for item in summer_appropriate_items):
+            score += 0.2  # 여름에 적합한 착장은 20% 가산
+        
+        # 화이트+화이트 조합 체크 및 감점
+        top_color = extracted_items.get("top", {}).get("color", "").lower()
+        bottom_color = extracted_items.get("bottom", {}).get("color", "").lower()
+        if top_color == "화이트" and bottom_color == "화이트":
+            score -= 0.4  # 화이트+화이트 조합은 40% 감점 (단조로움)
         
         # 상황 태그 매칭 (가중치 높음)
         situation_matched = False

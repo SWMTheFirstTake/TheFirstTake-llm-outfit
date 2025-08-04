@@ -33,6 +33,10 @@ class SimpleFashionExpertService:
         print(f"   - 컬러 추천: {len(self.fashion_reference_data['color_recommendations'])}개")
         print(f"   - 스타일링 팁: {len(self.fashion_reference_data['styling_tips'])}개")
         
+        # 여름 시즌 설정
+        self.current_season = "summer"
+        print(f"🌞 현재 시즌: {self.current_season} - 짧은 옷들만 추천")
+        
         # 전문가별 특성 정의
         self.expert_profiles = {
             FashionExpertType.STYLE_ANALYST: {
@@ -48,6 +52,11 @@ class SimpleFashionExpertService:
 - 다양한 표현과 어조 사용 (감탄, 걱정, 제안, 설명 등)
 - 상황에 따라 다른 반응 (칭찬, 조언, 질문 등)
 
+**여름 시즌 규칙:**
+- 현재 여름이므로 짧은 옷들만 추천 (반팔, 반바지, 미니스커트 등)
+- 긴 옷(긴팔, 긴바지, 롱스커트)은 추천하지 않음
+- 시원하고 가벼운 소재의 옷만 추천
+
 **JSON 데이터 활용:**
 - top: 상의 정보 (item, color, fit, material)
 - bottom: 하의 정보 (item, color, fit, material)  
@@ -56,16 +65,17 @@ class SimpleFashionExpertService:
 - styling_methods: 스타일링 방법 (top_wearing_method, tuck_degree, fit_details 등)
 
 **대화 예시 (다양한 스타일):**
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 나쁘지 않아. {styling_points} 포인트가 괜찮아."
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 나쁘지 않아. {tuck_degree} 스타일링이 깔끔해."
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 괜찮네. {fit_details}라서 체형이 좀 보완될 거야."
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 체형에 적당해. {fit_details}라서 날씬해 보일 거야."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 여름에 딱이야. {styling_points} 포인트가 시원해 보여."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 여름에 괜찮아. {tuck_degree} 스타일링이 깔끔해."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 여름에 적당해. {fit_details}라서 시원할 거야."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 여름에 좋아. {fit_details}라서 가벼워 보여."
 
 **핵심 규칙:**
 1. 반드시 JSON 데이터의 실제 정보를 사용하되, 자연스럽게 녹여내기
-2. 다양한 감정과 어조로 대화 (기쁨, 걱정, 확신, 제안 등)
-3. 상황에 맞는 반응 (칭찬, 조언, 질문, 설명)
-4. 2-3문장으로 간결하게, 하지만 다양하게"""
+2. 여름 시즌에 맞는 짧은 옷들만 추천
+3. 다양한 감정과 어조로 대화 (기쁨, 걱정, 확신, 제안 등)
+4. 상황에 맞는 반응 (칭찬, 조언, 질문, 설명)
+5. 2-3문장으로 간결하게, 하지만 다양하게"""
             },
             FashionExpertType.TREND_EXPERT: {
                 "role": "패션 트렌드 전문가",
@@ -80,6 +90,11 @@ class SimpleFashionExpertService:
 - 다양한 표현과 어조 사용 (감탄, 놀람, 확신, 제안 등)
 - 상황에 따라 다른 반응 (칭찬, 조언, 질문 등)
 
+**여름 시즌 규칙:**
+- 현재 여름이므로 짧은 옷들만 추천 (반팔, 반바지, 미니스커트 등)
+- 긴 옷(긴팔, 긴바지, 롱스커트)은 추천하지 않음
+- 시원하고 가벼운 소재의 옷만 추천
+
 **JSON 데이터 활용:**
 - top: 상의 정보 (item, color, fit, material)
 - bottom: 하의 정보 (item, color, fit, material)  
@@ -88,16 +103,17 @@ class SimpleFashionExpertService:
 - styling_methods: 스타일링 방법 (top_wearing_method, tuck_degree, fit_details 등)
 
 **대화 예시 (다양한 스타일):**
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 요즘 유행이야. {silhouette_balance}가 괜찮아."
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 트렌디해. {styling_points} 포인트 요즘 많이입어."
-- "이 조합 인스타에서 자주 보여. {fit_details}가 트렌디해. {top_color} {top_item} + {bottom_color} {bottom_item} 많이입어."
-- "{top_item} 요즘 많이 입어. {top_color} 컬러가 이번 시즌에 괜찮아. {bottom_color} {bottom_item}도 트렌디해."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 여름에 요즘 유행이야. {silhouette_balance}가 시원해 보여."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 여름에 트렌디해. {styling_points} 포인트 요즘 많이입어."
+- "이 조합 여름에 인스타에서 자주 보여. {fit_details}가 트렌디해. {top_color} {top_item} + {bottom_color} {bottom_item} 많이입어."
+- "{top_item} 여름에 요즘 많이 입어. {top_color} 컬러가 이번 시즌에 괜찮아. {bottom_color} {bottom_item}도 트렌디해."
 
 **핵심 규칙:**
 1. 반드시 JSON 데이터의 실제 정보를 사용하되, 자연스럽게 녹여내기
-2. 트렌디하고 활기찬 어조로 대화
-3. 상황에 맞는 반응 (칭찬, 조언, 질문, 설명)
-4. 2-3문장으로 간결하게, 하지만 다양하게"""
+2. 여름 시즌에 맞는 짧은 옷들만 추천
+3. 트렌디하고 활기찬 어조로 대화
+4. 상황에 맞는 반응 (칭찬, 조언, 질문, 설명)
+5. 2-3문장으로 간결하게, 하지만 다양하게"""
             },
             FashionExpertType.COLOR_EXPERT: {
                 "role": "퍼스널 컬러 전문가",
@@ -112,6 +128,11 @@ class SimpleFashionExpertService:
 - 다양한 표현과 어조 사용 (감탄, 걱정, 확신, 제안 등)
 - 상황에 따라 다른 반응 (칭찬, 조언, 질문 등)
 
+**여름 시즌 규칙:**
+- 현재 여름이므로 짧은 옷들만 추천 (반팔, 반바지, 미니스커트 등)
+- 긴 옷(긴팔, 긴바지, 롱스커트)은 추천하지 않음
+- 시원하고 가벼운 소재의 옷만 추천
+
 **JSON 데이터 활용:**
 - top: 상의 정보 (item, color, fit, material)
 - bottom: 하의 정보 (item, color, fit, material)  
@@ -120,16 +141,17 @@ class SimpleFashionExpertService:
 - styling_methods: 스타일링 방법 (top_wearing_method, tuck_degree, fit_details 등)
 
 **대화 예시 (다양한 스타일):**
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 톤온톤으로 잘 어우러져."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 여름에 톤온톤으로 잘 어우러져."
 - "{top_color} {top_item} + {bottom_color} {bottom_item} 조합에서 색상이 좀 어색해. {top_color} 대신 다른 색상은 어떨까?"
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 퍼스널 컬러랑 어울려. {top_color}가 피부톤을 밝게 해줘."
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합의 색상 밸런스가 괜찮아. {styling_points} 포인트도 색상과 잘 맞아."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 여름에 퍼스널 컬러랑 어울려. {top_color}가 피부톤을 밝게 해줘."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합의 색상 밸런스가 여름에 괜찮아. {styling_points} 포인트도 색상과 잘 맞아."
 
 **핵심 규칙:**
 1. 반드시 JSON 데이터의 실제 정보를 사용하되, 자연스럽게 녹여내기
-2. 색상에 대한 전문성과 감탄을 담은 대화
-3. 상황에 맞는 반응 (칭찬, 조언, 질문, 설명)
-4. 2-3문장으로 간결하게, 하지만 다양하게"""
+2. 여름 시즌에 맞는 짧은 옷들만 추천
+3. 색상에 대한 전문성과 감탄을 담은 대화
+4. 상황에 맞는 반응 (칭찬, 조언, 질문, 설명)
+5. 2-3문장으로 간결하게, 하지만 다양하게"""
             },
             FashionExpertType.FITTING_COORDINATOR: {
                 "role": "가상 피팅 코디네이터",
@@ -144,6 +166,11 @@ class SimpleFashionExpertService:
 - 다양한 표현과 어조 사용 (감탄, 걱정, 확신, 제안 등)
 - 상황에 따라 다른 반응 (칭찬, 조언, 질문 등)
 
+**여름 시즌 규칙:**
+- 현재 여름이므로 짧은 옷들만 추천 (반팔, 반바지, 미니스커트 등)
+- 긴 옷(긴팔, 긴바지, 롱스커트)은 추천하지 않음
+- 시원하고 가벼운 소재의 옷만 추천
+
 **JSON 데이터 활용:**
 - top: 상의 정보 (item, color, fit, material)
 - bottom: 하의 정보 (item, color, fit, material)  
@@ -152,16 +179,17 @@ class SimpleFashionExpertService:
 - styling_methods: 스타일링 방법 (top_wearing_method, tuck_degree, fit_details 등)
 
 **대화 예시 (다양한 스타일):**
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 괜찮아. {silhouette_balance}가 나쁘지 않아."
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 전체적으로는 좋은데 {styling_points} 포인트가 특히 잘 어울려."
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 괜찮아. {fit_details}와 {tuck_degree}가 균형잡혀 있어."
-- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 피팅 관점에서는 괜찮아."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 여름에 괜찮아. {silhouette_balance}가 시원해 보여."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 여름에 전체적으로는 좋은데 {styling_points} 포인트가 특히 잘 어울려."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 여름에 괜찮아. {fit_details}와 {tuck_degree}가 균형잡혀 있어."
+- "{top_color} {top_item} + {bottom_color} {bottom_item} 조합이 여름에 피팅 관점에서는 괜찮아."
 
 **핵심 규칙:**
 1. 반드시 JSON 데이터의 실제 정보를 사용하되, 자연스럽게 녹여내기
-2. 종합적이고 균형잡힌 관점으로 대화
-3. 상황에 맞는 반응 (칭찬, 조언, 질문, 설명)
-4. 2-3문장으로 간결하게, 하지만 다양하게"""
+2. 여름 시즌에 맞는 짧은 옷들만 추천
+3. 종합적이고 균형잡힌 관점으로 대화
+4. 상황에 맞는 반응 (칭찬, 조언, 질문, 설명)
+5. 2-3문장으로 간결하게, 하지만 다양하게"""
             }
         }
     
@@ -930,19 +958,57 @@ class SimpleFashionExpertService:
     async def _generate_json_based_response(self, user_input: str, expert_type: FashionExpertType, json_data: dict = None) -> str:
         """JSON 데이터를 기반으로 자연스럽고 다양한 대화 스타일로 답변 생성"""
         
-        # JSON 데이터가 없으면 기본 데이터 사용
+        # JSON 데이터가 없으면 기본 데이터 사용 (여름 시즌에 맞게, 다양한 색상 조합)
         if not json_data:
-            json_data = {
-                "top": {"item": "긴팔 셔츠", "color": "화이트", "fit": "레귤러핏", "material": "면"},
-                "bottom": {"item": "와이드 슬랙스", "color": "베이지", "fit": "와이드핏", "material": "린넨"},
-                "shoes": {"item": "로퍼", "color": "브라운", "style": "캐주얼"},
-                "styling_methods": {
+            import random
+            
+            # 다양한 색상 조합 (화이트+화이트 제외)
+            color_combinations = [
+                {"top": "네이비", "bottom": "베이지"},
+                {"top": "블랙", "bottom": "베이지"},
+                {"top": "그레이", "bottom": "네이비"},
+                {"top": "베이지", "bottom": "네이비"},
+                {"top": "화이트", "bottom": "네이비"},
+                {"top": "화이트", "bottom": "블랙"},
+                {"top": "카키", "bottom": "화이트"},
+                {"top": "네이비", "bottom": "화이트"}
+            ]
+            
+            selected_colors = random.choice(color_combinations)
+            
+            # 소개팅/비즈니스 상황 체크
+            formal_keywords = ["소개팅", "데이트", "면접", "출근", "비즈니스", "회사", "미팅", "회의", "오피스"]
+            is_formal_occasion = any(keyword in user_input.lower() for keyword in formal_keywords)
+            
+            # 상황에 따른 상의 아이템 선택
+            if is_formal_occasion:
+                top_item = "반팔 셔츠"  # 소개팅/비즈니스에는 셔츠
+                bottom_item = "슬랙스"   # 소개팅/비즈니스에는 슬랙스
+                shoes_item = "로퍼"      # 소개팅/비즈니스에는 로퍼
+                styling_methods = {
                     "top_wearing_method": "앞부분만 살짝 넣기",
                     "tuck_degree": "앞부분만 넣기",
-                    "fit_details": "어깨 딱 맞게, 가슴 여유있게",
-                    "silhouette_balance": "상하의 길이 비율이 균형잡힘",
-                    "styling_points": "소매 롤업, 버튼 위쪽 1-2개 해제"
+                    "fit_details": "깔끔하고 정돈된 핏",
+                    "silhouette_balance": "비즈니스에 적합한 실루엣",
+                    "styling_points": "단추 위쪽 1-2개 해제, 소매 롤업"
                 }
+            else:
+                top_item = "반팔 티셔츠"  # 캐주얼에는 티셔츠
+                bottom_item = "반바지"    # 캐주얼에는 반바지
+                shoes_item = "스니커즈"   # 캐주얼에는 스니커즈
+                styling_methods = {
+                    "top_wearing_method": "자연스럽게 내려놓기",
+                    "tuck_degree": "넣지 않기",
+                    "fit_details": "시원하고 가벼운 핏",
+                    "silhouette_balance": "여름에 적합한 짧은 실루엣",
+                    "styling_points": "시원한 소재, 가벼운 느낌"
+                }
+            
+            json_data = {
+                "top": {"item": top_item, "color": selected_colors["top"], "fit": "레귤러핏", "material": "면"},
+                "bottom": {"item": bottom_item, "color": selected_colors["bottom"], "fit": "레귤러핏", "material": "면"},
+                "shoes": {"item": shoes_item, "color": "화이트", "style": "캐주얼"},
+                "styling_methods": styling_methods
             }
         
         # JSON 데이터에서 정보 추출
@@ -989,6 +1055,24 @@ class SimpleFashionExpertService:
         response_pool = expert_responses.get(expert_type, expert_responses[FashionExpertType.STYLE_ANALYST])
         response = random.choice(response_pool)
         
+        # 스타일링 방법 추가 (간단하고 실용적인 팁)
+        if styling_info:
+            styling_tips = []
+            
+            # 주요 스타일링 포인트들
+            if styling_info.get("top_wearing_method"):
+                styling_tips.append(f"상의는 {styling_info['top_wearing_method']}")
+            
+            if styling_info.get("tuck_degree"):
+                styling_tips.append(f"바지는 {styling_info['tuck_degree']}")
+            
+            if styling_info.get("styling_points"):
+                styling_tips.append(f"{styling_info['styling_points']}")
+            
+            # 스타일링 팁 추가
+            if styling_tips:
+                response += f" 💡 스타일링: {', '.join(styling_tips)}"
+        
         # 추가 정보 (신발, 액세서리 등) - 신발은 항상 추천 (구어체 사용)
         if shoes_info.get("item"):
             # 색상 중복 방지
@@ -1030,8 +1114,102 @@ class SimpleFashionExpertService:
             
             response += shoe_expression
         
+        # 여름 시즌 필터링 적용
+        response = self._filter_for_summer_season(response, json_data)
+        
+        # 소개팅/비즈니스 상황 필터링 적용
+        response = self._filter_for_formal_occasion(response, json_data, user_input)
+        
         # 상황별 필터링 및 용어 개선
         response = self._improve_response_for_occasion(response, user_input)
+        
+        return response
+
+    def _filter_for_summer_season(self, response: str, json_data: dict) -> str:
+        """여름 시즌에 맞는 짧은 옷들만 추천하도록 필터링"""
+        if self.current_season != "summer":
+            return response
+        
+        # 여름에 부적합한 긴 옷들 체크
+        summer_inappropriate_items = [
+            "긴팔", "롱슬리브", "긴바지", "롱팬츠", "롱스커트", "맥시스커트", 
+            "코트", "패딩", "니트", "스웨터", "가디건", "블레이저"
+        ]
+        
+        # JSON 데이터에서 아이템 확인
+        top_item = json_data.get("top", {}).get("item", "").lower()
+        bottom_item = json_data.get("bottom", {}).get("item", "").lower()
+        top_color = json_data.get("top", {}).get("color", "").lower()
+        bottom_color = json_data.get("bottom", {}).get("color", "").lower()
+        
+        # 화이트+화이트 조합 체크 및 수정
+        if top_color == "화이트" and bottom_color == "화이트":
+            # 화이트+화이트 조합을 다른 색상으로 변경
+            color_alternatives = ["베이지", "네이비", "그레이", "블랙", "카키"]
+            import random
+            new_color = random.choice(color_alternatives)
+            
+            # 응답에서 색상 교체
+            response = response.replace("화이트", new_color, 1)  # 첫 번째 화이트만 교체
+            response = response.replace("화이트", new_color, 1)  # 두 번째 화이트도 교체
+            
+            # 색상 변경 이유 설명 추가
+            response += f" 화이트+화이트는 너무 단조로워서 {new_color}로 바꿨어!"
+        
+        # 여름에 부적합한 아이템이 포함되어 있으면 수정
+        has_inappropriate_item = any(item in top_item for item in summer_inappropriate_items) or \
+                               any(item in bottom_item for item in summer_inappropriate_items)
+        
+        if has_inappropriate_item:
+            # 여름에 적합한 대체 아이템으로 수정
+            summer_alternatives = {
+                "긴팔": "반팔",
+                "롱슬리브": "반팔", 
+                "긴바지": "반바지",
+                "롱팬츠": "반바지",
+                "롱스커트": "미니스커트",
+                "맥시스커트": "미니스커트",
+                "코트": "반팔",
+                "패딩": "반팔",
+                "니트": "반팔",
+                "스웨터": "반팔",
+                "가디건": "반팔",
+                "블레이저": "반팔"
+            }
+            
+            # 응답에서 부적합한 아이템을 여름에 적합한 아이템으로 교체
+            for inappropriate, appropriate in summer_alternatives.items():
+                if inappropriate in response:
+                    response = response.replace(inappropriate, appropriate)
+            
+            # 여름 시즌 강조 문구 추가
+            response += " 여름에 딱 맞는 시원한 조합이야!"
+        
+        return response
+
+    def _filter_for_formal_occasion(self, response: str, json_data: dict, user_input: str) -> str:
+        """소개팅/비즈니스 상황에서는 티셔츠 대신 정장적인 아이템 추천"""
+        # 소개팅/비즈니스 상황 체크
+        formal_keywords = ["소개팅", "데이트", "면접", "출근", "비즈니스", "회사", "미팅", "회의", "오피스"]
+        is_formal_occasion = any(keyword in user_input.lower() for keyword in formal_keywords)
+        
+        if not is_formal_occasion:
+            return response
+        
+        # JSON 데이터에서 아이템 확인
+        top_item = json_data.get("top", {}).get("item", "").lower()
+        
+        # 티셔츠를 정장적인 아이템으로 교체
+        if "티셔츠" in top_item:
+            formal_alternatives = ["반팔 셔츠", "반팔 블라우스", "반팔 폴로", "반팔 니트"]
+            import random
+            new_item = random.choice(formal_alternatives)
+            
+            # 응답에서 아이템 교체
+            response = response.replace("티셔츠", new_item.split()[-1])  # "티셔츠" 부분만 교체
+            
+            # 교체 이유 설명 추가
+            response += f" 소개팅에는 {new_item}가 더 적합해!"
         
         return response
 
