@@ -232,3 +232,14 @@ class ClaudeVisionService:
         
         # 4. 기본값
         return "image/jpeg"
+
+# 전역 인스턴스 생성
+import os
+from config import settings
+
+try:
+    claude_vision_service = ClaudeVisionService(api_key=settings.CLAUDE_API_KEY)
+    print(f"✅ claude_vision_service 전역 인스턴스 생성 완료")
+except Exception as e:
+    print(f"❌ claude_vision_service 전역 인스턴스 생성 실패: {e}")
+    claude_vision_service = None

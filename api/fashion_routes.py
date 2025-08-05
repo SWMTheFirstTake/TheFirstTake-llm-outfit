@@ -12,13 +12,20 @@ from models.fashion_models import (
     FashionExpertType
 )
 from pydantic import BaseModel
-from services.fashion_expert_service import SimpleFashionExpertService
+from services.fashion_expert_service import SimpleFashionExpertService, get_fashion_expert_service
 from services.redis_service import redis_service
 from config import settings
 from services.claude_vision_service import ClaudeVisionService
 from services.s3_service import s3_service
+from services.score_calculator_service import ScoreCalculator
+from services.batch_analyzer_service import BatchAnalyzerService
+from services.outfit_analyzer_service import OutfitAnalyzerService
+from services.outfit_matcher_service import outfit_matcher_service
+from services.utils import save_outfit_analysis_to_json, analyze_situations_from_outfit
 
 logger = logging.getLogger(__name__)
+
+
 
 # 서비스 인스턴스
 expert_service=None
@@ -45,387 +52,12 @@ except Exception as e:
 # 라우터 생성
 router = APIRouter(prefix="/api", tags=["fashion"])
 
-def get_fashion_expert_service():
-    """패션 전문가 서비스 인스턴스 반환"""
-    return expert_service
-
-def analyze_situations_from_outfit(extracted_items: dict) -> list:
-    """착장 분석을 통해 적합한 상황 태그 추출 (여름 시즌 고려)"""
-    situations = []
-    
-    # 상의 분석
-    top_item = extracted_items.get("top", {}).get("item", "").lower()
-    top_color = extracted_items.get("top", {}).get("color", "").lower()
-    top_fit = extracted_items.get("top", {}).get("fit", "").lower()
-    
-    # 하의 분석
-    bottom_item = extracted_items.get("bottom", {}).get("item", "").lower()
-    bottom_color = extracted_items.get("bottom", {}).get("color", "").lower()
-    bottom_fit = extracted_items.get("bottom", {}).get("fit", "").lower()
-    
-    # 신발 분석
-    shoes_item = extracted_items.get("shoes", {}).get("item", "").lower()
-    shoes_style = extracted_items.get("shoes", {}).get("style", "").lower()
-    
-    # 스타일링 방법 분석
-    styling_methods = extracted_items.get("styling_methods", {})
-    tuck_degree = styling_methods.get("tuck_degree", "").lower()
-    fit_details = styling_methods.get("fit_details", "").lower()
-    
-    # 여름 시즌 체크 (현재 여름이므로 여름에 적합한 착장만 고려)
-    summer_appropriate = True
-    summer_inappropriate_items = ["긴팔", "롱슬리브", "긴바지", "롱팬츠", "롱스커트", "맥시스커트", "코트", "패딩", "니트", "스웨터"]
-    
-    if any(item in top_item for item in summer_inappropriate_items) or \
-       any(item in bottom_item for item in summer_inappropriate_items):
-        summer_appropriate = False
-    
-
-    
-    # 상황별 판단 로직
-    # 소개팅/데이트
-    if any(keyword in top_item for keyword in ["셔츠", "블라우스", "블레이저"]) and \
-       any(keyword in bottom_item for keyword in ["슬랙스", "팬츠"]) and \
-       any(keyword in shoes_item for keyword in ["로퍼", "옥스포드", "힐"]):
-        situations.append("소개팅")
-        situations.append("데이트")
-    
-    # 면접/비즈니스
-    if any(keyword in top_item for keyword in ["셔츠", "블라우스", "블레이저"]) and \
-       any(keyword in bottom_item for keyword in ["슬랙스"]) and \
-       any(keyword in shoes_item for keyword in ["로퍼", "옥스포드", "펌프스"]) and \
-       ("넣" in tuck_degree or "정돈" in fit_details):
-        situations.append("면접")
-        situations.append("비즈니스")
-    
-    # 캐주얼/일상
-    if any(keyword in top_item for keyword in ["티셔츠", "맨투맨", "후드티"]) and \
-       any(keyword in bottom_item for keyword in ["데님", "팬츠"]) and \
-       any(keyword in shoes_item for keyword in ["스니커즈", "샌들"]):
-        situations.append("캐주얼")
-        situations.append("일상")
-    
-    # 여행/아웃도어
-    if any(keyword in top_item for keyword in ["니트", "스웨터"]) and \
-       any(keyword in bottom_item for keyword in ["팬츠", "데님"]) and \
-       any(keyword in shoes_item for keyword in ["스니커즈", "부츠"]):
-        situations.append("여행")
-        situations.append("아웃도어")
-    
-    # 파티/이벤트
-    if any(keyword in top_item for keyword in ["드레스", "블라우스"]) and \
-       any(keyword in bottom_item for keyword in ["스커트", "드레스"]) and \
-       any(keyword in shoes_item for keyword in ["힐", "샌들"]):
-        situations.append("파티")
-        situations.append("이벤트")
-    
-    # 여름 시즌에 적합하지 않은 착장은 제외
-    if not summer_appropriate:
-        situations = ["여름에 부적합"]
-    
-    # 중복 제거
-    situations = list(set(situations))
-    
-    # 기본값 설정
-    if not situations:
-        situations = ["일상"]
-    
-    return situations
-
-def save_outfit_analysis_to_json(extracted_items: dict, room_id: str = None) -> str:
-    """착장 분석 결과를 JSON 파일로 저장"""
-    try:
-        # 상황 태그 분석
-        situations = analyze_situations_from_outfit(extracted_items)
-        
-        # 저장할 데이터 구성
-        save_data = {
-            "extracted_items": extracted_items,
-            "situations": situations,
-            "analysis_timestamp": datetime.now().isoformat(),
-            "room_id": room_id
-        }
-        
-        # 저장 디렉토리 확인 및 생성
-        save_dir = r"C:\fashion_summary\item"
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        
-        # 파일명 생성
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"outfit_analysis_{timestamp}.json"
-        
-        filepath = os.path.join(save_dir, filename)
-        
-        # JSON 파일 저장
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(save_data, f, ensure_ascii=False, indent=2)
-        
-        print(f"✅ 착장 분석 결과 저장 완료: {filepath}")
-        return filepath
-        
-    except Exception as e:
-        print(f"❌ 착장 분석 결과 저장 실패: {e}")
-        logger.error(f"착장 분석 결과 저장 실패: {e}")
-        return None
-
-def find_matching_outfits_from_s3(user_input: str, expert_type: str) -> dict:
-    """S3의 JSON 파일들에서 사용자 입력과 매칭되는 착장 찾기"""
-    try:
-        print(f"🔍 S3 매칭 시작: '{user_input}' (전문가: {expert_type})")
-        
-        if s3_service is None:
-            print("❌ s3_service가 None입니다!")
-            return None
-        
-        if s3_service.s3_client is None:
-            print("❌ s3_service.s3_client가 None입니다!")
-            return None
-        
-        # S3에서 모든 JSON 파일 가져오기
-        json_files = s3_service.list_json_files()
-        if not json_files:
-            print("❌ S3에 JSON 파일이 없습니다!")
-            return None
-        
-        print(f"📁 S3에서 {len(json_files)}개 JSON 파일 발견")
-        
-        matching_outfits = []
-        
-        # 각 JSON 파일 분석
-        for file_info in json_files:
-            try:
-                # JSON 내용 가져오기
-                json_content = s3_service.get_json_content(file_info['filename'])
-                
-                # 매칭 점수 계산
-                match_score = calculate_match_score(user_input, json_content, expert_type)
-                
-                if match_score > 0.05:  # 임계값을 더 낮춰서 더 많은 착장 포함
-                    matching_outfits.append({
-                        'filename': file_info['filename'],
-                        'content': json_content,
-                        'score': match_score,
-                        's3_url': file_info['s3_url']
-                    })
-                    
-            except Exception as e:
-                print(f"❌ JSON 파일 분석 실패: {file_info['filename']} - {e}")
-                continue
-        
-        # 점수순으로 정렬
-        matching_outfits.sort(key=lambda x: x['score'], reverse=True)
-        
-        # 상위 15개까지 반환 (더 많은 선택지)
-        top_matches = matching_outfits[:15]
-        
-        print(f"✅ S3 매칭 완료: {len(top_matches)}개 착장 발견 (전체 매칭: {len(matching_outfits)}개)")
-        if top_matches:
-            print(f"   - 최고 점수: {top_matches[0]['filename']} ({top_matches[0]['score']:.3f})")
-        
-        return {
-            'matches': top_matches,
-            'all_files': json_files,  # 모든 파일 정보 추가
-            'total_files': len(json_files),
-            'matching_count': len(matching_outfits)
-        }
-        
-    except Exception as e:
-        print(f"❌ S3 매칭 실패: {e}")
-        logger.error(f"S3 매칭 실패: {e}")
-        return None
-
-def calculate_match_score(user_input: str, json_content: dict, expert_type: str) -> float:
-    """사용자 입력과 JSON 내용의 매칭 점수 계산 (여름 시즌 고려)"""
-    score = 0.0
-    
-    try:
-        # 사용자 입력을 소문자로 변환
-        user_input_lower = user_input.lower()
-        
-        # JSON에서 추출된 아이템들
-        extracted_items = json_content.get('extracted_items', {})
-        situations = json_content.get('situations', [])
-        
-        # 여름 시즌 체크 - 여름에 부적합한 착장은 점수 감점
-        summer_inappropriate_items = ["긴팔", "롱슬리브", "긴바지", "롱팬츠", "롱스커트", "맥시스커트", "코트", "패딩", "니트", "스웨터"]
-        top_item = extracted_items.get("top", {}).get("item", "").lower()
-        bottom_item = extracted_items.get("bottom", {}).get("item", "").lower()
-        
-        # 여름에 부적합한 아이템이 있으면 점수 감점
-        if any(item in top_item for item in summer_inappropriate_items) or \
-           any(item in bottom_item for item in summer_inappropriate_items):
-            score -= 0.3  # 여름에 부적합한 착장은 30% 감점
-        
-        # 여름에 적합한 아이템이 있으면 점수 가산
-        summer_appropriate_items = ["반팔", "반바지", "티셔츠", "탑"]
-        if any(item in top_item for item in summer_appropriate_items) or \
-           any(item in bottom_item for item in summer_appropriate_items):
-            score += 0.2  # 여름에 적합한 착장은 20% 가산
-        
-        # 화이트+화이트 조합 체크 및 감점
-        top_color = extracted_items.get("top", {}).get("color", "").lower()
-        bottom_color = extracted_items.get("bottom", {}).get("color", "").lower()
-        if top_color == "화이트" and bottom_color == "화이트":
-            score -= 0.4  # 화이트+화이트 조합은 40% 감점 (단조로움)
-        
-        # 소개팅/비즈니스 상황에 부적절한 아이템 체크 및 감점
-        formal_inappropriate_items = ["그래픽", "오버사이즈", "와이드", "맨투맨", "후드티", "크롭", "티셔츠"]
-        formal_keywords = ["소개팅", "데이트", "면접", "출근", "비즈니스", "회사", "미팅", "회의", "오피스"]
-        is_formal_occasion = any(keyword in user_input_lower for keyword in formal_keywords)
-        
-        if is_formal_occasion:
-            if any(item in top_item for item in formal_inappropriate_items):
-                score -= 0.5  # 소개팅/비즈니스에 부적절한 아이템은 50% 감점
-        
-        # 상황 태그 매칭 (가중치 높음)
-        situation_matched = False
-        for situation in situations:
-            if situation.lower() in user_input_lower:
-                score += 0.4
-                situation_matched = True
-                break
-        
-        # 상황 태그가 매칭되지 않은 경우, 상황별 유사성 점수 부여
-        if not situation_matched:
-            situation_similarity_score = calculate_situation_similarity(user_input_lower, situations)
-            score += situation_similarity_score
-        
-        # 아이템 매칭
-        for category, item_info in extracted_items.items():
-            if isinstance(item_info, dict):
-                item_name = item_info.get('item', '').lower()
-                item_color = item_info.get('color', '').lower()
-                item_fit = item_info.get('fit', '').lower()
-                
-                # 아이템명 매칭
-                if item_name and item_name in user_input_lower:
-                    score += 0.3
-                
-                # 색상 매칭
-                if item_color and item_color in user_input_lower:
-                    score += 0.2
-                
-                # 핏 매칭
-                if item_fit and item_fit in user_input_lower:
-                    score += 0.2
-        
-        # 스타일링 방법 매칭 (다양한 스타일링 포인트 포함)
-        styling_methods = extracted_items.get('styling_methods', {})
-        if isinstance(styling_methods, dict):
-            for method_key, method_value in styling_methods.items():
-                if isinstance(method_value, str) and method_value.lower() in user_input_lower:
-                    # 주요 스타일링 (더 높은 가중치)
-                    if method_key in ['top_wearing_method', 'tuck_degree', 'fit_details', 'silhouette_balance']:
-                        score += 0.3
-                    # 세부 스타일링 (일반 가중치)
-                    else:
-                        score += 0.2
-        
-        # 전문가 타입별 가중치
-        if expert_type == "stylist":
-            # 스타일리스트는 스타일링 방법에 더 높은 가중치
-            if styling_methods:
-                score += 0.1
-        
-        # 다양성 보너스: 다양한 상황/스타일 조합에 가산점
-        diversity_bonus = calculate_diversity_bonus(situations, extracted_items)
-        score += diversity_bonus
-        
-        return min(score, 1.0)  # 최대 1.0으로 제한
-        
-    except Exception as e:
-        print(f"❌ 매칭 점수 계산 실패: {e}")
-        return 0.0
-
-def calculate_diversity_bonus(situations: list, extracted_items: dict) -> float:
-    """다양성 보너스 점수 계산"""
-    bonus = 0.0
-    
-    try:
-        # 상황 다양성 보너스
-        if len(situations) >= 3:
-            bonus += 0.05  # 3개 이상의 상황 태그
-        elif len(situations) >= 2:
-            bonus += 0.03  # 2개의 상황 태그
-        
-        # 아이템 다양성 보너스
-        item_categories = ['top', 'bottom', 'shoes', 'accessories']
-        filled_categories = 0
-        
-        for category in item_categories:
-            if category in extracted_items and extracted_items[category]:
-                item_info = extracted_items[category]
-                if isinstance(item_info, dict) and item_info.get('item'):
-                    filled_categories += 1
-        
-        if filled_categories >= 4:
-            bonus += 0.05  # 4개 카테고리 모두 채워짐
-        elif filled_categories >= 3:
-            bonus += 0.03  # 3개 카테고리 채워짐
-        
-        # 스타일링 방법 다양성 보너스 (새로운 필드들 포함)
-        styling_methods = extracted_items.get('styling_methods', {})
-        if isinstance(styling_methods, dict):
-            filled_styling_methods = 0
-            for key, value in styling_methods.items():
-                if isinstance(value, str) and value.strip():
-                    filled_styling_methods += 1
-            
-            if filled_styling_methods >= 5:
-                bonus += 0.03  # 5개 이상의 스타일링 방법
-            elif filled_styling_methods >= 3:
-                bonus += 0.02  # 3개 이상의 스타일링 방법
-        
-        return bonus
-        
-    except Exception as e:
-        print(f"❌ 다양성 보너스 계산 실패: {e}")
-        return 0.0
-
-def calculate_situation_similarity(user_input: str, situations: list) -> float:
-    """사용자 입력과 상황 태그의 유사성 점수 계산 (더 관대하게)"""
-    score = 0.0
-    
-    # 상황별 키워드 매핑 (더 포괄적으로)
-    situation_keywords = {
-        "일상": ["일상", "평상시", "데일리", "일반", "보통", "스터디", "공부", "학교", "대학", "카페", "쇼핑"],
-        "캐주얼": ["캐주얼", "편안", "편한", "자유", "스터디", "공부", "학교", "대학", "친구", "모임"],
-        "소개팅": ["소개팅", "데이트", "연애", "만남", "미팅", "첫만남", "첫 만남"],
-        "면접": ["면접", "비즈니스", "업무", "회사", "직장", "오피스", "회의"],
-        "파티": ["파티", "이벤트", "축하", "기념", "특별", "클럽", "축하연"],
-        "여행": ["여행", "아웃도어", "야외", "레저", "휴가", "액티비티", "운동"]
-    }
-    
-    # 사용자 입력에서 상황 키워드 찾기
-    for situation, keywords in situation_keywords.items():
-        for keyword in keywords:
-            if keyword in user_input:
-                # 해당 상황이 JSON의 situations에 있는지 확인
-                if situation in situations:
-                    score += 0.6  # 유사한 상황에 대한 점수를 더 높임
-                    break
-    
-    # 기본 점수: 모든 상황에 대해 작은 점수 부여
-    if situations:
-        score += 0.1  # 기본 보너스
-    
-    return min(score, 0.8)  # 최대 0.8로 제한
-
 @router.get("/health")
 def health_check():
     return ResponseModel(
         success=True,
         message="패션 전문가 시스템 정상 작동 중",
         data={"service": "fashion_expert_system"}
-    )
-
-@router.get("/test")
-def test():
-    return ResponseModel(
-        success=True,
-        message="Fashion Expert API Test",
-        data={"experts": list(FashionExpertType)}
     )
 
 @router.post("/expert/single")
@@ -436,7 +68,7 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
     try:
         # S3에서 매칭되는 착장 찾기
         print(f"🔍 S3 매칭 시도: '{request.user_input}' (전문가: {request.expert_type.value})")
-        matching_result = find_matching_outfits_from_s3(request.user_input, request.expert_type.value)
+        matching_result = outfit_matcher_service.find_matching_outfits_from_s3(request.user_input, request.expert_type.value)
         
         if not matching_result:
             # S3 연결 실패 등의 경우 기존 방식 사용
@@ -458,7 +90,7 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
             for file_info in matching_result.get('all_files', []):
                 try:
                     json_content = s3_service.get_json_content(file_info['filename'])
-                    match_score = calculate_match_score(request.user_input, json_content, request.expert_type.value)
+                    match_score = outfit_matcher_service.score_calculator.calculate_match_score(request.user_input, json_content, request.expert_type.value)
                     all_outfits.append({
                         'filename': file_info['filename'],
                         'content': json_content,
@@ -517,7 +149,7 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
                     for file_info in random_additional:
                         try:
                             json_content = s3_service.get_json_content(file_info['filename'])
-                            match_score = calculate_match_score(request.user_input, json_content, request.expert_type.value)
+                            match_score = outfit_matcher_service.score_calculator.calculate_match_score(request.user_input, json_content, request.expert_type.value)
                             available_matches.append({
                                 'filename': file_info['filename'],
                                 'content': json_content,
@@ -608,65 +240,7 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
                             print(f"⚠️ 전체에서 선택")
                     
                     # 전문가 타입별 필터링
-                    if request.expert_type.value == "style_analyst":
-                        # 스타일 분석가: 다양한 스타일링 방법이 있는 것 우선
-                        filtered_candidates = []
-                        for match in candidates:
-                            styling_methods = match['content'].get('extracted_items', {}).get('styling_methods', {})
-                            if isinstance(styling_methods, dict) and len(styling_methods) >= 2:
-                                filtered_candidates.append(match)
-                        
-                        if filtered_candidates:
-                            candidates = filtered_candidates
-                            print(f"🎯 스타일 분석가 필터 적용: {len(candidates)}개 후보")
-                        else:
-                            print(f"⚠️ 스타일 분석가 필터 적용 불가, 전체 후보 사용")
-                    
-                    elif request.expert_type.value == "trend_expert":
-                        # 트렌드 전문가: 최신 스타일 (최근 파일) 우선
-                        recent_candidates = sorted(candidates, 
-                                             key=lambda x: x['filename'], reverse=True)[:5]
-                        if recent_candidates:
-                            candidates = recent_candidates
-                            print(f"🎯 트렌드 전문가 필터 적용: 최근 5개 파일")
-                        else:
-                            print(f"⚠️ 트렌드 전문가 필터 적용 불가, 전체 후보 사용")
-                    
-                    elif request.expert_type.value == "color_expert":
-                        # 컬러 전문가: 다양한 색상이 있는 것 우선
-                        filtered_candidates = []
-                        for match in candidates:
-                            items = match['content'].get('extracted_items', {})
-                            colors = set()
-                            for category, item_info in items.items():
-                                if isinstance(item_info, dict) and item_info.get('color'):
-                                    colors.add(item_info['color'])
-                            if len(colors) >= 2:
-                                filtered_candidates.append(match)
-                        
-                        if filtered_candidates:
-                            candidates = filtered_candidates
-                            print(f"🎯 컬러 전문가 필터 적용: {len(candidates)}개 후보")
-                        else:
-                            print(f"⚠️ 컬러 전문가 필터 적용 불가, 전체 후보 사용")
-                    
-                    elif request.expert_type.value == "fitting_coordinator":
-                        # 핏팅 코디네이터: 다양한 핏 정보가 있는 것 우선
-                        filtered_candidates = []
-                        for match in candidates:
-                            items = match['content'].get('extracted_items', {})
-                            fits = set()
-                            for category, item_info in items.items():
-                                if isinstance(item_info, dict) and item_info.get('fit'):
-                                    fits.add(item_info['fit'])
-                            if len(fits) >= 2:
-                                filtered_candidates.append(match)
-                        
-                        if filtered_candidates:
-                            candidates = filtered_candidates
-                            print(f"🎯 핏팅 코디네이터 필터 적용: {len(candidates)}개 후보")
-                        else:
-                            print(f"⚠️ 핏팅 코디네이터 필터 적용 불가, 전체 후보 사용")
+                    candidates = outfit_matcher_service.score_calculator.apply_expert_filter(candidates, request.expert_type.value)
                     
                     # 최종 선택 (균등 확률)
                     if candidates:
@@ -911,93 +485,7 @@ def generate_concise_response(extracted_items: dict, situations: list, expert_ty
         print(f"❌ 응답 생성 실패: {e}")
         return "착장 정보를 분석하는 중 오류가 발생했습니다."
 
-@router.post("/expert/chain")
-async def expert_chain_analysis(request: ExpertChainRequest):
-    """전문가 체인 분석 - 모든 전문가가 순차적으로 분석"""
-    try:
-        # Redis에서 기존 프롬프트 히스토리 가져오기
-        existing_prompt = redis_service.get_prompt(request.room_id)
-        
-        # 기존 프롬프트와 새로운 user_input 합치기
-        if existing_prompt:
-            # 새로운 질문을 명확하게 구분하여 추가
-            combined_input = existing_prompt + "\n\n[새로운 질문] " + request.user_input
-            logger.info(f"기존 프롬프트와 새로운 입력 합침: room_id={request.room_id}, 기존길이={len(existing_prompt)}, 새길이={len(request.user_input)}")
-        else:
-            combined_input = request.user_input
-            logger.info(f"새로운 입력만 사용: room_id={request.room_id}, 길이={len(request.user_input)}")
-        
-        # 수정된 요청 객체 생성
-        modified_request = ExpertChainRequest(
-            user_input=combined_input,
-            room_id=request.room_id,
-            expert_sequence=request.expert_sequence,
-            user_profile=request.user_profile,
-            context_info=request.context_info
-        )
-        
-        # 전문가 체인 분석 실행
-        result = await expert_service.get_expert_chain_analysis(modified_request)
-        
-        # 각 전문가 분석 결과를 Redis에 추가
-        if "expert_analyses" in result:
-            for expert_result in result["expert_analyses"]:
-                expert_type = expert_result.get("expert_type", "unknown")
-                analysis = expert_result.get("analysis", "분석 결과 없음")
-                analysis_content = f"[{expert_type}] {analysis}"
-                redis_service.append_prompt(request.room_id, analysis_content)
-        
-        return ResponseModel(
-            success=True,
-            message="전문가 체인 분석이 완료되었습니다",
-            data=result
-        )
-    except Exception as e:
-        logger.error(f"전문가 체인 분석 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/expert/types")
-async def get_expert_types():
-    """사용 가능한 전문가 타입과 설명"""
-    expert_info = {}
-    for expert_type, profile in expert_service.expert_profiles.items():
-        expert_info[expert_type.value] = {
-            "role": profile["role"],
-            "expertise": profile["expertise"],
-            "focus": profile["focus"]
-        }
-    return ResponseModel(
-        success=True,
-        message="전문가 타입 정보를 성공적으로 조회했습니다",
-        data=expert_info
-    )
-
-@router.post("/curation")
-async def generate_curation(request: ExpertChainRequest):
-    """기존 큐레이션 API - 이제 전문가 체인으로 처리"""
-    try:
-        result = await expert_service.get_expert_chain_analysis(request)
-        
-        # 기존 형식으로 변환
-        converted_results = []
-        for i, expert_result in enumerate(result["expert_analyses"]):
-            converted_results.append({
-                "style": expert_result["expert_type"], 
-                "content": expert_result["analysis"] + f" ({i+1}번째 전문가)"
-            })
-        
-        return ResponseModel(
-            success=True,
-            message="패션 큐레이션이 성공적으로 생성되었습니다",
-            data={
-                "room_id": request.room_id,
-                "results": converted_results,
-                "comprehensive_analysis": result.get("comprehensive_recommendation", "")
-            }
-        )
-    except Exception as e:
-        logger.error(f"큐레이션 생성 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 # ✅ Vision 서비스 상태 확인
 @router.get("/vision/status")
@@ -1027,76 +515,23 @@ async def vision_status():
 async def analyze_outfit(request: ImageAnalysisRequest):
     """S3 이미지 링크 기반 착장 분석 API (패션 데이터 매칭 포함)"""
     
-    print(f"🔍 analyze_outfit 호출됨 (S3 링크)")
-    print(f"🔍 claude_vision_service 상태: {claude_vision_service is not None}")
-    print(f"🔍 이미지 URL: {request.image_url}")
-    
-    # 서비스 초기화 확인
-    if claude_vision_service is None:
-        print("❌ claude_vision_service가 None입니다!")
-        raise HTTPException(
-            status_code=500, 
-            detail="Claude Vision 서비스가 초기화되지 않았습니다."
-        )
+    # OutfitAnalyzerService 인스턴스 생성
+    outfit_analyzer = OutfitAnalyzerService()
     
     try:
-        # S3 이미지 링크 분석
-        image_analysis = claude_vision_service.analyze_outfit_from_url(
+        # 새로운 서비스를 사용하여 분석 수행
+        result = await outfit_analyzer.analyze_outfit_from_url(
             image_url=request.image_url,
+            room_id=request.room_id if hasattr(request, 'room_id') else None,
             prompt=request.prompt
         )
-        print("✅ Claude API 호출 완료")
-        
-        # 패션 데이터와 매칭
-        fashion_expert_service = get_fashion_expert_service()
-        if fashion_expert_service:
-            matched_result = await fashion_expert_service.analyze_image_with_fashion_data(image_analysis)
-            extracted_items = matched_result["extracted_items"]
-        else:
-            # 패션 데이터 매칭 없이 기본 분석만 반환
-            extracted_items = image_analysis
-        
-        # JSON 파일로 저장 (로컬)
-        saved_filepath = save_outfit_analysis_to_json(extracted_items, room_id=request.room_id if hasattr(request, 'room_id') else None)
-        
-        # S3에 JSON 업로드 (이미지 파일명 기반)
-        s3_json_url = None
-        if s3_service:
-            try:
-                # 이미지 URL에서 파일명 추출
-                image_filename = request.image_url.split('/')[-1].split('.')[0]  # 확장자 제거
-                
-                # JSON 파일이 이미 존재하는지 확인
-                if not s3_service.check_json_exists(image_filename):
-                    # JSON 데이터 준비
-                    json_data = {
-                        "extracted_items": extracted_items,
-                        "situations": analyze_situations_from_outfit(extracted_items),
-                        "analysis_timestamp": datetime.now().isoformat(),
-                        "room_id": request.room_id if hasattr(request, 'room_id') else None,
-                        "source_image_url": request.image_url
-                    }
-                    
-                    # S3에 JSON 업로드
-                    s3_json_url = s3_service.upload_json(json_data, image_filename)
-                    print(f"✅ S3 JSON 업로드 완료: {s3_json_url}")
-                else:
-                    print(f"ℹ️ JSON 파일이 이미 존재합니다: {image_filename}")
-                    
-            except Exception as e:
-                print(f"❌ S3 JSON 업로드 실패: {e}")
         
         return ResponseModel(
-            success=True,
-            message="이미지 분석 및 패션 데이터 매칭이 성공적으로 완료되었습니다",
-            data={
-                "extracted_items": extracted_items,
-                "s3_json_url": s3_json_url
-            }
+            success=result["success"],
+            message=result["message"],
+            data=result["data"]
         )
         
-    except HTTPException:
-        raise
     except Exception as e:
         print(f"❌ 에러 발생: {str(e)}")
         logger.error(f"이미지 분석 실패: {str(e)}")
@@ -1239,102 +674,24 @@ async def upload_images_to_s3(files: list[UploadFile] = File(...)):
 async def batch_analyze_images():
     """S3의 /image 디렉토리에서 JSON이 없는 이미지들을 일괄 분석"""
     
-    print(f"🔍 batch_analyze_images 호출됨")
-    print(f"🔍 s3_service 상태: {s3_service is not None}")
-    
-    # S3 서비스 초기화 확인
-    if s3_service is None:
-        print("❌ s3_service가 None입니다!")
-        raise HTTPException(
-            status_code=500, 
-            detail="S3 서비스가 초기화되지 않았습니다."
-        )
+    # BatchAnalyzerService 인스턴스 생성
+    batch_analyzer = BatchAnalyzerService()
     
     try:
-        # JSON이 없는 이미지 파일들 조회
-        files_to_analyze = s3_service.get_files_without_json()
+        # 배치 분석 수행
+        result = await batch_analyzer.analyze_batch()
         
-        if not files_to_analyze:
+        if result["total_files"] == 0:
             return ResponseModel(
                 success=True,
                 message="분석할 이미지가 없습니다. 모든 이미지에 대한 JSON이 이미 존재합니다.",
-                data={
-                    "total_files": 0,
-                    "analyzed_files": [],
-                    "failed_files": []
-                }
+                data=result
             )
-        
-        print(f"🔍 분석 대상 파일 수: {len(files_to_analyze)}")
-        
-        analyzed_files = []
-        failed_files = []
-        
-        # 각 파일에 대해 분석 수행
-        for file_info in files_to_analyze:
-            try:
-                print(f"🔍 파일 분석 중: {file_info['filename']}")
-                
-                # ContentType 문제가 있는 경우 수정 시도
-                if s3_service:
-                    try:
-                        # S3에서 파일의 ContentType 확인
-                        response = s3_service.s3_client.head_object(
-                            Bucket=s3_service.bucket_name,
-                            Key=file_info['s3_key']
-                        )
-                        content_type = response.get('ContentType', '')
-                        
-                        # ContentType이 잘못된 경우 수정
-                        if content_type == 'binary/octet-stream' or not content_type.startswith('image/'):
-                            print(f"⚠️ ContentType 수정 중: {content_type} -> image/jpeg")
-                            s3_service.fix_image_content_type(file_info['s3_key'])
-                    except Exception as e:
-                        print(f"⚠️ ContentType 확인 실패: {e}")
-                
-                # ImageAnalysisRequest 객체 생성
-                request_data = ImageAnalysisRequest(
-                    image_url=file_info['s3_url'],
-                    room_id=None,  # 배치 처리시 room_id는 None
-                    prompt=None
-                )
-                
-                # 내부적으로 analyze_outfit 함수 호출
-                result = await analyze_outfit(request_data)
-                
-                if result.success:
-                    analyzed_files.append({
-                        "filename": file_info['filename'],
-                        "s3_url": file_info['s3_url'],
-                        "analysis_result": result.data
-                    })
-                    print(f"✅ 파일 분석 완료: {file_info['filename']}")
-                else:
-                    failed_files.append({
-                        "filename": file_info['filename'],
-                        "s3_url": file_info['s3_url'],
-                        "error": result.message
-                    })
-                    print(f"❌ 파일 분석 실패: {file_info['filename']} - {result.message}")
-                
-            except Exception as e:
-                print(f"❌ 파일 분석 중 에러 발생: {file_info['filename']} - {str(e)}")
-                failed_files.append({
-                    "filename": file_info['filename'],
-                    "s3_url": file_info['s3_url'],
-                    "error": str(e)
-                })
         
         return ResponseModel(
             success=True,
-            message=f"배치 분석 완료: {len(analyzed_files)}개 성공, {len(failed_files)}개 실패",
-            data={
-                "total_files": len(files_to_analyze),
-                "analyzed_files": analyzed_files,
-                "failed_files": failed_files,
-                "success_count": len(analyzed_files),
-                "failure_count": len(failed_files)
-            }
+            message=f"배치 분석 완료: {result['success_count']}개 성공, {result['failure_count']}개 실패",
+            data=result
         )
         
     except Exception as e:
@@ -1510,17 +867,8 @@ async def delete_outfit(filename: str):
 async def analyze_outfit_upload(file: UploadFile = File(...)):
     """파일 업로드 기반 착장 분석 API (패션 데이터 매칭 포함)"""
     
-    print(f"🔍 analyze_outfit_upload 호출됨")
-    print(f"🔍 claude_vision_service 상태: {claude_vision_service is not None}")
-    print(f"🔍 파일명: {file.filename}")
-    
-    # 서비스 초기화 확인
-    if claude_vision_service is None:
-        print("❌ claude_vision_service가 None입니다!")
-        raise HTTPException(
-            status_code=500, 
-            detail="Claude Vision 서비스가 초기화되지 않았습니다."
-        )
+    # OutfitAnalyzerService 인스턴스 생성
+    outfit_analyzer = OutfitAnalyzerService()
     
     try:
         # 파일 유효성 검증
@@ -1539,30 +887,18 @@ async def analyze_outfit_upload(file: UploadFile = File(...)):
                 detail="빈 파일입니다."
             )
         
-        # Claude API 호출
-        image_analysis = claude_vision_service.analyze_outfit(image_bytes)
-        print("✅ Claude API 호출 완료")
-        
-        # 패션 데이터와 매칭
-        fashion_expert_service = get_fashion_expert_service()
-        if fashion_expert_service:
-            matched_result = await fashion_expert_service.analyze_image_with_fashion_data(image_analysis)
-            extracted_items = matched_result["extracted_items"]
-        else:
-            # 패션 데이터 매칭 없이 기본 분석만 반환
-            extracted_items = image_analysis
-        
-        # JSON 파일로 저장
-        saved_filepath = save_outfit_analysis_to_json(extracted_items)
-        
-        return ResponseModel(
-            success=True,
-            message="이미지 분석 및 패션 데이터 매칭이 성공적으로 완료되었습니다",
-            data={"extracted_items": extracted_items}
+        # 새로운 서비스를 사용하여 분석 수행
+        result = await outfit_analyzer.analyze_outfit_from_bytes(
+            image_bytes=image_bytes,
+            filename=file.filename
         )
         
-    except HTTPException:
-        raise
+        return ResponseModel(
+            success=result["success"],
+            message=result["message"],
+            data=result["data"]
+        )
+        
     except Exception as e:
         print(f"❌ 에러 발생: {str(e)}")
         logger.error(f"이미지 분석 실패: {str(e)}")
