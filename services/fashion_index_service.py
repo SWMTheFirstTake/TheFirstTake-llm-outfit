@@ -358,7 +358,7 @@ class FashionIndexService:
             first_search = True
             
             # 각 조건별로 검색
-            if 'situations' in criteria:
+            if 'situations' in criteria and criteria['situations']:
                 for situation in criteria['situations']:
                     filenames = redis_service.smembers(f"{self.index_prefix}:situation:{situation.lower()}")
                     if first_search:
@@ -367,7 +367,7 @@ class FashionIndexService:
                     else:
                         all_filenames = all_filenames.intersection(set(filenames))
             
-            if 'items' in criteria:
+            if 'items' in criteria and criteria['items']:
                 for item in criteria['items']:
                     filenames = redis_service.smembers(f"{self.index_prefix}:item:{item.lower()}")
                     if first_search:
@@ -376,7 +376,7 @@ class FashionIndexService:
                     else:
                         all_filenames = all_filenames.intersection(set(filenames))
             
-            if 'colors' in criteria:
+            if 'colors' in criteria and criteria['colors']:
                 for color in criteria['colors']:
                     filenames = redis_service.smembers(f"{self.index_prefix}:color:{color.lower()}")
                     if first_search:
@@ -384,6 +384,25 @@ class FashionIndexService:
                         first_search = False
                     else:
                         all_filenames = all_filenames.intersection(set(filenames))
+            
+            if 'styling' in criteria and criteria['styling']:
+                for styling in criteria['styling']:
+                    filenames = redis_service.smembers(f"{self.index_prefix}:styling:{styling.lower()}")
+                    if first_search:
+                        all_filenames = set(filenames)
+                        first_search = False
+                    else:
+                        all_filenames = all_filenames.intersection(set(filenames))
+            
+            # 검색 조건이 없거나 결과가 없는 경우, 전체 파일에서 랜덤 선택
+            if not all_filenames:
+                print("⚠️ 검색 조건에 맞는 파일이 없어 전체 파일에서 선택")
+                # 전체 메타데이터에서 랜덤 선택
+                all_metadata_keys = redis_service.keys(f"{self.metadata_prefix}:*")
+                if all_metadata_keys:
+                    import random
+                    selected_keys = random.sample(all_metadata_keys, min(limit, len(all_metadata_keys)))
+                    all_filenames = {key.replace(f"{self.metadata_prefix}:", "") for key in selected_keys}
             
             # 결과 반환
             results = []

@@ -55,13 +55,23 @@ class OutfitMatcherService:
             
             # 후보 파일들에 대해 점수 계산
             matching_outfits = []
-            for file_info in candidate_files:
+            total_candidates = len(candidate_files)
+            scored_candidates = 0
+            
+            print(f"🔍 {total_candidates}개 후보 파일에 대해 점수 계산 시작...")
+            
+            for i, file_info in enumerate(candidate_files):
                 try:
                     # JSON 내용 가져오기
                     json_content = s3_service.get_json_content(file_info['filename'])
                     
                     # 매칭 점수 계산
                     match_score = self.score_calculator.calculate_match_score(user_input, json_content, expert_type)
+                    scored_candidates += 1
+                    
+                    # 점수 디버그 출력 (처음 5개만)
+                    if i < 5:
+                        print(f"   📊 {file_info['filename']}: {match_score:.4f}")
                     
                     if match_score > 0.05:
                         matching_outfits.append({
@@ -74,6 +84,8 @@ class OutfitMatcherService:
                 except Exception as e:
                     print(f"❌ 후보 파일 분석 실패: {file_info['filename']} - {e}")
                     continue
+            
+            print(f"📊 점수 계산 완료: {scored_candidates}/{total_candidates}개 파일, {len(matching_outfits)}개 매칭 (점수 > 0.05)")
             
             # 점수순으로 정렬
             matching_outfits.sort(key=lambda x: x['score'], reverse=True)
@@ -212,15 +224,24 @@ class OutfitMatcherService:
             if keyword in user_input_lower:
                 criteria['styling'].append(keyword)
         
-        # 🔄 대화 컨텍스트 활용: 검색 조건이 없고 room_id가 있는 경우
-        if room_id and not any(criteria.values()):
-            print(f"🔄 대화 컨텍스트 활용: room_id={room_id}")
+        # 🔄 대화 컨텍스트 활용: 모호한 입력이나 검색 조건이 없고 room_id가 있는 경우
+        print(f"🔍 검색 조건 추출 결과: {criteria}")
+        print(f"🔍 검색 조건이 비어있는가? {not any(criteria.values())}")
+        
+        # 모호한 입력 키워드들
+        ambiguous_keywords = ["다른", "다른거", "다른거는", "또", "또다른", "추천", "추천해", "보여줘", "보여줘요"]
+        is_ambiguous = any(keyword in user_input_lower for keyword in ambiguous_keywords)
+        
+        if room_id and (not any(criteria.values()) or is_ambiguous):
+            print(f"🔄 대화 컨텍스트 활용: room_id={room_id}, 모호한 입력={is_ambiguous}")
             
             # 최근 사용된 착장들의 특성을 기반으로 검색 조건 생성
             recent_criteria = self._get_context_from_recent_outfits(room_id)
             if recent_criteria:
                 print(f"📝 컨텍스트 기반 검색 조건: {recent_criteria}")
                 return recent_criteria
+        else:
+            print(f"⚠️ 컨텍스트 기반 검색을 사용하지 않음 (조건: room_id={room_id}, 비어있음={not any(criteria.values())}, 모호한 입력={is_ambiguous})")
         
         return criteria
     
@@ -237,13 +258,16 @@ class OutfitMatcherService:
             
             print(f"📊 최근 사용된 착장 {len(recent_outfits)}개 분석")
             
-            # 각 착장의 특성 수집
-            all_situations = set()
+            # 각 착장의 특성 수집 (최신 순서로 처리)
+            all_situations = []  # 순서를 유지하기 위해 리스트 사용
             all_items = set()
             all_colors = set()
             all_styling = set()
             
-            for filename in recent_outfits:
+            # 가장 최근 착장의 상황을 우선적으로 사용
+            primary_situations = []
+            
+            for i, filename in enumerate(recent_outfits):
                 try:
                     # S3에서 착장 정보 가져오기
                     json_content = s3_service.get_json_content(filename)
@@ -253,8 +277,15 @@ class OutfitMatcherService:
                     extracted_items = json_content.get('extracted_items', {})
                     situations = json_content.get('situations', [])
                     
-                    # 상황 추가
-                    all_situations.update(situations)
+                    # 가장 최근 착장의 상황을 우선 저장
+                    if i == 0 and situations:
+                        primary_situations = situations[:2]  # 최대 2개
+                        print(f"🎯 최근 착장 상황: {primary_situations}")
+                    
+                    # 상황 추가 (최신 순서로)
+                    for situation in situations:
+                        if situation not in all_situations:
+                            all_situations.append(situation)
                     
                     # 아이템 및 색상 추가
                     for category, item_info in extracted_items.items():
@@ -281,9 +312,9 @@ class OutfitMatcherService:
                     print(f"❌ 착장 분석 실패: {filename} - {e}")
                     continue
             
-            # 가장 많이 나타나는 특성들을 검색 조건으로 사용
+            # 가장 최근에 사용된 특성들을 검색 조건으로 사용
             context_criteria = {
-                'situations': list(all_situations)[:2],  # 최대 2개 상황
+                'situations': primary_situations if primary_situations else all_situations[:2],  # 최근 착장 상황 우선
                 'items': list(all_items)[:3],           # 최대 3개 아이템
                 'colors': list(all_colors)[:2],         # 최대 2개 색상
                 'styling': list(all_styling)[:2]        # 최대 2개 스타일링
@@ -320,8 +351,11 @@ class OutfitMatcherService:
     def _find_candidates_with_index(self, criteria: dict) -> list:
         """인덱스를 사용하여 후보 파일들 찾기"""
         try:
+            print(f"🔍 인덱스 검색 조건: {criteria}")
+            
             # 고급 검색으로 후보 찾기
             candidates = fashion_index_service.advanced_search(criteria, limit=50)
+            print(f"📁 인덱스 검색 결과: {len(candidates)}개 후보")
             
             # 메타데이터를 파일 정보 형태로 변환
             file_infos = []
@@ -331,6 +365,7 @@ class OutfitMatcherService:
                     's3_url': candidate['s3_url']
                 })
             
+            print(f"✅ 인덱스 후보 변환 완료: {len(file_infos)}개")
             return file_infos
             
         except Exception as e:

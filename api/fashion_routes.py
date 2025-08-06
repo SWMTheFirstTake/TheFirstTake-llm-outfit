@@ -318,6 +318,7 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
                     "situations": situations
                 },
                 "total_matches": matching_result['matching_count'],
+                "search_method": matching_result.get('search_method', 'N/A'),
                 "source": "s3_json"
             }
         )
