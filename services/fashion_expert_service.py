@@ -1171,9 +1171,52 @@ class SimpleFashionExpertService:
         # 시스템 프롬프트 구성 (구체적인 옷 조합 정보 강조)
         system_prompt = f"""당신은 {expert_profile['role']}입니다. {expert_profile['focus']}
 
-**구체적인 옷 조합 추천 규칙:**
-- 반드시 JSON 데이터의 실제 옷 정보를 구체적으로 언급해야 합니다
-- 응답 시작 부분에 추천하는 옷 조합을 명확하게 명시하기
+**🚨 응답 시작 강제 규칙 (절대 위반 금지):**
+- 첫 문장은 무조건 구체적인 옷 조합으로 시작해야 함
+- "{json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')}랑 {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')}가 잘 어울려" 같은 형태로 시작
+- "이 옷 조합 좋아", "그 옷 조합 좋아", "저 옷 조합 좋아" 같은 주관적 표현 절대 금지
+- 주관적 판단, 감탄사, 추상적 설명 절대 금지
+- 바로 구체적인 옷 조합 분석으로 시작해야 함
+
+**🔥 핵심 원칙: 첫 문장은 반드시 구체적인 옷 조합으로 시작!**
+- 첫 문장은 무조건 "{json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')}랑 {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')}가 잘 어울려" 같은 형태로 시작
+- 주관적 판단, 감탄사, 추상적 설명 절대 금지
+- 바로 구체적인 옷 조합 분석으로 시작해야 함
+
+**🚨 절대 금지: 첫 문장에서 주관적 뉘앙스 표현**
+- "이 옷 조합 좋아", "그 옷 조합 좋아", "저 옷 조합 좋아" (가장 중요한 금지)
+- "이 조합이 딱이네", "그 옷 조합이 딱이야", "진짜 좋아", "너무 좋아", "완전 좋아"
+- "그 옷 조합 괜찮아", "이 옷 조합 괜찮아", "저 옷 조합 괜찮아"
+- "야", "어", "오" 같은 감탄사 (특히 "야"는 절대 금지)
+- "이 옷 조합", "이런 조합", "그 옷 조합" 같은 주관적 표현
+- "피부톤이랑 잘 어울리는 색이라" 같은 막연한 설명
+- "세련되면서도 깔끔한 느낌 나" 같은 주관적 판단
+- "정말 멋질 거 같아" 같은 감탄 표현
+- "캐주얼하면서도 클래식한 스타일이 될 거야" 같은 추상적 표현
+- "자신감 있게 입고 나갈 수 있을 거 같네" 같은 주관적 판단
+- "피부톤에 따라 다르겠지만" 같은 조건부 설명
+- "대체로", "일반적으로", "보통" 같은 추상적 표현
+- 모든 감탄사나 주관적 판단으로 시작하는 문장
+- "이렇게 입으면" 같은 추상적 표현
+- "딱이야", "완벽해", "좋아", "괜찮아" 같은 감탄 표현
+- "딱일 거 같아", "좋을 거 같아" 같은 추측 표현
+- "~는 깔끔하고 세련된 느낌 주고", "~는 여름 분위기 물씬 나" 같은 막연한 설명
+- "~는 ~한 느낌", "~는 ~한 분위기" 같은 추상적 표현
+- "잘 어울려", "좋아 보여", "멋있어 보여" 같은 주관적 판단
+- "피부톤에 잘 맞는 중성적인 컬러라" 같은 막연한 설명
+- "편하게 입을 수 있을 거야" 같은 추상적 표현
+- "깔끔하고 세련된 느낌 낼 수 있어" 같은 주관적 판단
+- "편하면서도 깔끔한 느낌이 들 거야" 같은 막연한 설명
+- "피부톤에 잘 맞는 색감이라 화사해 보일 거고" 같은 주관적 판단
+- "캐주얼한 무드가 살아날 거 같아" 같은 추상적 표현
+- "소개팅 가는데 딱이네" 같은 주관적 판단
+
+**✅ 올바른 시작 예시 (반드시 이 형태로 시작):**
+- "{json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')}랑 {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')}가 잘 어울려"
+- "{json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')}와 {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')} 조합은 색상 대비가..."
+- "{json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')}에 {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')}를 매치하면..."
+
+**구체적인 옷 조합 정보:**
 - 상의: {json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')} ({json_data.get('top', {}).get('fit', '')})
 - 하의: {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')} ({json_data.get('bottom', {}).get('fit', '')})
 - 신발: {json_data.get('shoes', {}).get('color', '')} {json_data.get('shoes', {}).get('item', '')}
@@ -1204,13 +1247,16 @@ class SimpleFashionExpertService:
 위의 구체적인 옷 조합 정보를 바탕으로 간결하고 핵심적인 패션 조언을 제공해주세요. 반드시 응답 시작 부분에 추천하는 옷 조합을 명확하게 명시하고, 반말로 간결하게 응답해주세요."""
         
         # 사용자 프롬프트 (구체적인 옷 조합 강조)
-        user_prompt = f"이 {json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')} + {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')} 조합에 대해 {expert_profile['role']}의 관점에서 반말로 간결하게 조언해주세요. 반드시 실제 옷 정보를 명확하게 언급해주세요."
+        user_prompt = f"이 {json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')} + {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')} 조합에 대해 {expert_profile['role']}의 관점에서 반말로 간결하게 조언해주세요. 반드시 첫 문장은 '{json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')}랑 {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')}가 잘 어울려' 같은 형태로 시작하고, 실제 옷 정보를 명확하게 언급해주세요."
         
         try:
             # LLM 호출
             response = await self._call_openai_async(system_prompt, user_prompt)
             
-            # 여성 전용 아이템 필터링 적용 (가장 먼저)
+            # 응답 시작 부분 강제 수정 (가장 먼저 적용)
+            response = self._force_correct_response_start(response, json_data)
+            
+            # 여성 전용 아이템 필터링 적용
             response = self._filter_female_only_items(response, json_data)
             
             # 여름 시즌 필터링 적용
@@ -1403,6 +1449,60 @@ class SimpleFashionExpertService:
                             print(f"✅ {female_item} → 일반으로 대체")
         
         return response
+
+    def _force_correct_response_start(self, response: str, json_data: dict) -> str:
+        """응답 시작 부분을 강제로 올바른 형태로 수정"""
+        try:
+            # 금지된 시작 패턴들
+            forbidden_starts = [
+                "이 옷 조합 좋아",
+                "그 옷 조합 좋아", 
+                "저 옷 조합 좋아",
+                "이 조합 좋아",
+                "그 조합 좋아",
+                "저 조합 좋아",
+                "이 옷 조합이 딱이네",
+                "그 옷 조합이 딱이야",
+                "저 옷 조합이 딱이야",
+                "이 조합이 딱이네",
+                "그 조합이 딱이야",
+                "저 조합이 딱이야",
+                "진짜 좋아",
+                "너무 좋아",
+                "완전 좋아",
+                "정말 좋아",
+                "이 옷 조합 괜찮아",
+                "그 옷 조합 괜찮아",
+                "저 옷 조합 괜찮아",
+                "이 조합 괜찮아",
+                "그 조합 괜찮아",
+                "저 조합 괜찮아"
+            ]
+            
+            # 응답의 첫 문장 확인
+            first_sentence = response.split('.')[0].strip()
+            
+            # 금지된 시작 패턴이 있는지 확인
+            for forbidden_start in forbidden_starts:
+                if first_sentence.startswith(forbidden_start):
+                    # 올바른 시작으로 교체
+                    top_color = json_data.get('top', {}).get('color', '')
+                    top_item = json_data.get('top', {}).get('item', '')
+                    bottom_color = json_data.get('bottom', {}).get('color', '')
+                    bottom_item = json_data.get('bottom', {}).get('item', '')
+                    
+                    correct_start = f"{top_color} {top_item}랑 {bottom_color} {bottom_item}가 잘 어울려"
+                    
+                    # 첫 문장을 교체
+                    response = response.replace(first_sentence, correct_start, 1)
+                    print(f"🔄 응답 시작 부분 수정: '{forbidden_start}' → '{correct_start}'")
+                    break
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"응답 시작 부분 수정 실패: {e}")
+            return response
 
     def _improve_response_for_occasion(self, response: str, user_input: str) -> str:
         """상황별 필터링 및 용어 개선"""
