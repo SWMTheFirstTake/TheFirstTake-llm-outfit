@@ -12,10 +12,10 @@ class OutfitMatcherService:
         self.score_calculator = ScoreCalculator()
         self.use_index = True  # 인덱스 사용 여부
     
-    def find_matching_outfits_from_s3(self, user_input: str, expert_type: str) -> dict:
+    def find_matching_outfits_from_s3(self, user_input: str, expert_type: str, room_id: int = None) -> dict:
         """S3의 JSON 파일들에서 사용자 입력과 매칭되는 착장 찾기 (인덱스 기반 최적화)"""
         try:
-            print(f"🔍 S3 매칭 시작: '{user_input}' (전문가: {expert_type})")
+            print(f"🔍 S3 매칭 시작: '{user_input}' (전문가: {expert_type}, room_id: {room_id})")
             
             if s3_service is None:
                 print("❌ s3_service가 None입니다!")
@@ -28,7 +28,7 @@ class OutfitMatcherService:
             # 인덱스 사용 여부 확인
             if self.use_index:
                 print("🚀 인덱스 기반 빠른 검색 사용")
-                return self._find_matching_with_index(user_input, expert_type)
+                return self._find_matching_with_index(user_input, expert_type, room_id)
             else:
                 print("🐌 기존 방식 사용 (전체 스캔)")
                 return self._find_matching_with_full_scan(user_input, expert_type)
@@ -38,11 +38,11 @@ class OutfitMatcherService:
             logger.error(f"S3 매칭 실패: {e}")
             return None
     
-    def _find_matching_with_index(self, user_input: str, expert_type: str) -> dict:
+    def _find_matching_with_index(self, user_input: str, expert_type: str, room_id: int = None) -> dict:
         """인덱스 기반 빠른 검색"""
         try:
-            # 사용자 입력에서 검색 조건 추출
-            search_criteria = self._extract_search_criteria(user_input)
+            # 사용자 입력에서 검색 조건 추출 (대화 컨텍스트 활용)
+            search_criteria = self._extract_search_criteria(user_input, room_id)
             print(f"🔍 검색 조건: {search_criteria}")
             
             # 인덱스에서 후보 파일들 찾기
@@ -153,8 +153,8 @@ class OutfitMatcherService:
             print(f"❌ 전체 스캔 실패: {e}")
             return None
     
-    def _extract_search_criteria(self, user_input: str) -> dict:
-        """사용자 입력에서 검색 조건 추출"""
+    def _extract_search_criteria(self, user_input: str, room_id: int = None) -> dict:
+        """사용자 입력에서 검색 조건 추출 (대화 컨텍스트 활용)"""
         criteria = {
             'situations': [],
             'items': [],
@@ -212,7 +212,110 @@ class OutfitMatcherService:
             if keyword in user_input_lower:
                 criteria['styling'].append(keyword)
         
+        # 🔄 대화 컨텍스트 활용: 검색 조건이 없고 room_id가 있는 경우
+        if room_id and not any(criteria.values()):
+            print(f"🔄 대화 컨텍스트 활용: room_id={room_id}")
+            
+            # 최근 사용된 착장들의 특성을 기반으로 검색 조건 생성
+            recent_criteria = self._get_context_from_recent_outfits(room_id)
+            if recent_criteria:
+                print(f"📝 컨텍스트 기반 검색 조건: {recent_criteria}")
+                return recent_criteria
+        
         return criteria
+    
+    def _get_context_from_recent_outfits(self, room_id: int) -> dict:
+        """최근 사용된 착장들의 특성을 기반으로 검색 조건 생성"""
+        try:
+            from services.redis_service import redis_service
+            
+            # 최근 사용된 착장들 가져오기
+            recent_outfits = redis_service.get_recent_used_outfits(room_id, limit=5)
+            if not recent_outfits:
+                print("⚠️ 최근 사용된 착장이 없음")
+                return {}
+            
+            print(f"📊 최근 사용된 착장 {len(recent_outfits)}개 분석")
+            
+            # 각 착장의 특성 수집
+            all_situations = set()
+            all_items = set()
+            all_colors = set()
+            all_styling = set()
+            
+            for filename in recent_outfits:
+                try:
+                    # S3에서 착장 정보 가져오기
+                    json_content = s3_service.get_json_content(filename)
+                    if not json_content:
+                        continue
+                    
+                    extracted_items = json_content.get('extracted_items', {})
+                    situations = json_content.get('situations', [])
+                    
+                    # 상황 추가
+                    all_situations.update(situations)
+                    
+                    # 아이템 및 색상 추가
+                    for category, item_info in extracted_items.items():
+                        if isinstance(item_info, dict):
+                            # 아이템명에서 키워드 추출
+                            item_name = item_info.get('item', '').lower()
+                            if item_name:
+                                item_keywords = self._extract_keywords_from_text(item_name)
+                                all_items.update(item_keywords)
+                            
+                            # 색상 추가
+                            color = item_info.get('color', '').lower()
+                            if color:
+                                all_colors.add(color)
+                    
+                    # 스타일링 방법 추가
+                    styling_methods = extracted_items.get('styling_methods', {})
+                    for method_value in styling_methods.values():
+                        if isinstance(method_value, str):
+                            styling_keywords = self._extract_keywords_from_text(method_value.lower())
+                            all_styling.update(styling_keywords)
+                    
+                except Exception as e:
+                    print(f"❌ 착장 분석 실패: {filename} - {e}")
+                    continue
+            
+            # 가장 많이 나타나는 특성들을 검색 조건으로 사용
+            context_criteria = {
+                'situations': list(all_situations)[:2],  # 최대 2개 상황
+                'items': list(all_items)[:3],           # 최대 3개 아이템
+                'colors': list(all_colors)[:2],         # 최대 2개 색상
+                'styling': list(all_styling)[:2]        # 최대 2개 스타일링
+            }
+            
+            print(f"✅ 컨텍스트 기반 검색 조건 생성 완료")
+            return context_criteria
+            
+        except Exception as e:
+            print(f"❌ 컨텍스트 기반 검색 조건 생성 실패: {e}")
+            return {}
+    
+    def _extract_keywords_from_text(self, text: str) -> list:
+        """텍스트에서 패션 키워드 추출"""
+        keywords = []
+        
+        # 패션 키워드 목록
+        fashion_keywords = [
+            "니트", "데님", "가죽", "면", "실크", "울", "폴리에스터",
+            "긴팔", "반팔", "와이드", "스키니", "레귤러", "오버핏", "슬림",
+            "블랙", "화이트", "그레이", "브라운", "네이비", "베이지",
+            "티셔츠", "셔츠", "니트", "스웨터", "후드티", "맨투맨",
+            "슬랙스", "청바지", "팬츠", "반바지", "스커트",
+            "스니커즈", "로퍼", "옥스포드", "부츠", "샌들",
+            "넣기", "턱", "핏", "실루엣", "밸런스"
+        ]
+        
+        for keyword in fashion_keywords:
+            if keyword in text:
+                keywords.append(keyword)
+        
+        return keywords
     
     def _find_candidates_with_index(self, criteria: dict) -> list:
         """인덱스를 사용하여 후보 파일들 찾기"""

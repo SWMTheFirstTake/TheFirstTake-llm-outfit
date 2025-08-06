@@ -68,8 +68,8 @@ async def single_expert_analysis(request: ExpertAnalysisRequest):
     
     try:
         # S3에서 매칭되는 착장 찾기
-        print(f"🔍 S3 매칭 시도: '{request.user_input}' (전문가: {request.expert_type.value})")
-        matching_result = outfit_matcher_service.find_matching_outfits_from_s3(request.user_input, request.expert_type.value)
+        print(f"🔍 S3 매칭 시도: '{request.user_input}' (전문가: {request.expert_type.value}, room_id: {request.room_id})")
+        matching_result = outfit_matcher_service.find_matching_outfits_from_s3(request.user_input, request.expert_type.value, request.room_id)
         
         if not matching_result:
             # S3 연결 실패 등의 경우 기존 방식 사용
@@ -766,17 +766,22 @@ async def get_json_content(filename: str):
         raise HTTPException(status_code=500, detail=f"JSON 파일 내용 조회 실패: {str(e)}")
 
 @router.post("/admin/build-indexes")
-async def build_fashion_indexes():
+async def build_fashion_indexes(force_rebuild: bool = False):
     """패션 데이터 인덱스 구축"""
-    print("🔍 build_fashion_indexes 호출됨")
+    print(f"🔍 build_fashion_indexes 호출됨 (force_rebuild: {force_rebuild})")
     
     try:
         # 인덱스 구축
-        result = fashion_index_service.build_indexes()
+        result = fashion_index_service.build_indexes(force_rebuild=force_rebuild)
+        
+        if force_rebuild:
+            message = "패션 인덱스 전체 재구축 완료"
+        else:
+            message = "패션 인덱스 증분 업데이트 완료"
         
         return ResponseModel(
             success=True,
-            message="패션 인덱스 구축 완료",
+            message=message,
             data=result
         )
         
@@ -784,6 +789,26 @@ async def build_fashion_indexes():
         print(f"❌ 인덱스 구축 실패: {str(e)}")
         logger.error(f"인덱스 구축 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=f"인덱스 구축 실패: {str(e)}")
+
+@router.post("/admin/rebuild-indexes")
+async def rebuild_fashion_indexes():
+    """패션 데이터 인덱스 강제 재구축"""
+    print("🔍 rebuild_fashion_indexes 호출됨")
+    
+    try:
+        # 강제 재구축
+        result = fashion_index_service.build_indexes(force_rebuild=True)
+        
+        return ResponseModel(
+            success=True,
+            message="패션 인덱스 강제 재구축 완료",
+            data=result
+        )
+        
+    except Exception as e:
+        print(f"❌ 인덱스 재구축 실패: {str(e)}")
+        logger.error(f"인덱스 재구축 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"인덱스 재구축 실패: {str(e)}")
 
 @router.get("/admin/index-stats")
 async def get_index_stats():

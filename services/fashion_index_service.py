@@ -14,10 +14,20 @@ class FashionIndexService:
         self.index_prefix = "fashion_index"
         self.metadata_prefix = "fashion_metadata"
         
-    def build_indexes(self) -> Dict[str, int]:
+    def build_indexes(self, force_rebuild: bool = False) -> Dict[str, int]:
         """S3의 모든 JSON 파일을 분석하여 인덱스 구축"""
         print("🔍 패션 인덱스 구축 시작...")
         
+        if force_rebuild:
+            print("🔄 강제 재구축 모드: 기존 인덱스 완전 삭제")
+            self._clear_indexes()
+            return self._build_all_indexes()
+        else:
+            print("🔄 증분 업데이트 모드: 새로운 파일만 인덱싱")
+            return self._build_incremental_indexes()
+    
+    def _build_all_indexes(self) -> Dict[str, int]:
+        """전체 인덱스 재구축"""
         try:
             # S3에서 모든 JSON 파일 가져오기
             json_files = s3_service.list_json_files()
@@ -27,9 +37,6 @@ class FashionIndexService:
             
             indexed_count = 0
             total_count = len(json_files)
-            
-            # 기존 인덱스 초기화
-            self._clear_indexes()
             
             for file_info in json_files:
                 try:
@@ -47,13 +54,97 @@ class FashionIndexService:
                     print(f"❌ 파일 인덱싱 실패: {file_info['filename']} - {e}")
                     continue
             
-            print(f"✅ 인덱스 구축 완료: {indexed_count}/{total_count}개 파일")
+            print(f"✅ 전체 인덱스 구축 완료: {indexed_count}/{total_count}개 파일")
             return {"total": total_count, "indexed": indexed_count}
             
         except Exception as e:
-            print(f"❌ 인덱스 구축 실패: {e}")
-            logger.error(f"인덱스 구축 실패: {e}")
+            print(f"❌ 전체 인덱스 구축 실패: {e}")
+            logger.error(f"전체 인덱스 구축 실패: {e}")
             return {"total": 0, "indexed": 0}
+    
+    def _build_incremental_indexes(self) -> Dict[str, int]:
+        """증분 인덱스 업데이트 (새로운 파일만)"""
+        try:
+            # S3에서 모든 JSON 파일 가져오기
+            s3_files = s3_service.list_json_files()
+            if not s3_files:
+                print("❌ S3에 JSON 파일이 없습니다!")
+                return {"total": 0, "indexed": 0, "updated": 0}
+            
+            # Redis에 이미 인덱싱된 파일들 확인
+            existing_metadata_keys = redis_service.keys(f"{self.metadata_prefix}:*")
+            existing_files = set()
+            for key in existing_metadata_keys:
+                filename = key.replace(f"{self.metadata_prefix}:", "")
+                existing_files.add(filename)
+            
+            print(f"📊 기존 인덱싱된 파일: {len(existing_files)}개")
+            print(f"📊 S3 전체 파일: {len(s3_files)}개")
+            
+            # 새로운 파일들 찾기
+            s3_filenames = {file_info['filename'] for file_info in s3_files}
+            new_files = s3_filenames - existing_files
+            updated_files = set()
+            
+            print(f"🆕 새로 추가된 파일: {len(new_files)}개")
+            
+            # 새로운 파일들 인덱싱
+            indexed_count = 0
+            for file_info in s3_files:
+                if file_info['filename'] in new_files:
+                    try:
+                        # JSON 내용 가져오기
+                        json_content = s3_service.get_json_content(file_info['filename'])
+                        
+                        # 인덱스 구축
+                        self._index_file(file_info['filename'], json_content, file_info['s3_url'])
+                        indexed_count += 1
+                        
+                        if indexed_count % 5 == 0:
+                            print(f"   📊 새 파일 인덱싱 진행률: {indexed_count}/{len(new_files)}")
+                            
+                    except Exception as e:
+                        print(f"❌ 새 파일 인덱싱 실패: {file_info['filename']} - {e}")
+                        continue
+            
+            # 기존 파일들의 업데이트 확인 (타임스탬프 비교)
+            for file_info in s3_files:
+                if file_info['filename'] in existing_files:
+                    try:
+                        # 기존 메타데이터 조회
+                        existing_metadata = redis_service.get_json(f"{self.metadata_prefix}:{file_info['filename']}")
+                        if existing_metadata:
+                            existing_timestamp = existing_metadata.get('timestamp', '')
+                            
+                            # S3 파일의 최신 타임스탬프 확인
+                            json_content = s3_service.get_json_content(file_info['filename'])
+                            s3_timestamp = json_content.get('analysis_timestamp', '')
+                            
+                            # 타임스탬프가 다르면 업데이트
+                            if existing_timestamp != s3_timestamp:
+                                self._index_file(file_info['filename'], json_content, file_info['s3_url'])
+                                updated_files.add(file_info['filename'])
+                                
+                    except Exception as e:
+                        print(f"❌ 파일 업데이트 확인 실패: {file_info['filename']} - {e}")
+                        continue
+            
+            print(f"✅ 증분 인덱스 업데이트 완료:")
+            print(f"   - 새로 인덱싱된 파일: {len(new_files)}개")
+            print(f"   - 업데이트된 파일: {len(updated_files)}개")
+            print(f"   - 총 처리된 파일: {len(new_files) + len(updated_files)}개")
+            
+            return {
+                "total": len(s3_files),
+                "indexed": len(new_files),
+                "updated": len(updated_files),
+                "existing": len(existing_files)
+            }
+            
+        except Exception as e:
+            print(f"❌ 증분 인덱스 업데이트 실패: {e}")
+            logger.error(f"증분 인덱스 업데이트 실패: {e}")
+            return {"total": 0, "indexed": 0, "updated": 0}
     
     def _index_file(self, filename: str, content: dict, s3_url: str):
         """단일 파일을 인덱싱"""
