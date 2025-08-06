@@ -21,6 +21,7 @@ from services.score_calculator_service import ScoreCalculator
 from services.batch_analyzer_service import BatchAnalyzerService
 from services.outfit_analyzer_service import OutfitAnalyzerService
 from services.outfit_matcher_service import outfit_matcher_service
+from services.fashion_index_service import fashion_index_service
 from services.utils import save_outfit_analysis_to_json, analyze_situations_from_outfit
 
 logger = logging.getLogger(__name__)
@@ -763,6 +764,91 @@ async def get_json_content(filename: str):
         print(f"❌ JSON 파일 내용 조회 실패: {str(e)}")
         logger.error(f"JSON 파일 내용 조회 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=f"JSON 파일 내용 조회 실패: {str(e)}")
+
+@router.post("/admin/build-indexes")
+async def build_fashion_indexes():
+    """패션 데이터 인덱스 구축"""
+    print("🔍 build_fashion_indexes 호출됨")
+    
+    try:
+        # 인덱스 구축
+        result = fashion_index_service.build_indexes()
+        
+        return ResponseModel(
+            success=True,
+            message="패션 인덱스 구축 완료",
+            data=result
+        )
+        
+    except Exception as e:
+        print(f"❌ 인덱스 구축 실패: {str(e)}")
+        logger.error(f"인덱스 구축 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"인덱스 구축 실패: {str(e)}")
+
+@router.get("/admin/index-stats")
+async def get_index_stats():
+    """인덱스 통계 정보 조회"""
+    print("🔍 get_index_stats 호출됨")
+    
+    try:
+        stats = fashion_index_service.get_index_stats()
+        
+        return ResponseModel(
+            success=True,
+            message="인덱스 통계 조회 완료",
+            data=stats
+        )
+        
+    except Exception as e:
+        print(f"❌ 인덱스 통계 조회 실패: {str(e)}")
+        logger.error(f"인덱스 통계 조회 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"인덱스 통계 조회 실패: {str(e)}")
+
+@router.post("/admin/search-by-situation")
+async def search_by_situation(situation: str, limit: int = 20):
+    """상황별 검색 테스트"""
+    print(f"🔍 search_by_situation 호출됨: {situation}")
+    
+    try:
+        results = fashion_index_service.search_by_situation(situation, limit)
+        
+        return ResponseModel(
+            success=True,
+            message="상황별 검색 완료",
+            data={
+                "situation": situation,
+                "results": results,
+                "count": len(results)
+            }
+        )
+        
+    except Exception as e:
+        print(f"❌ 상황별 검색 실패: {str(e)}")
+        logger.error(f"상황별 검색 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"상황별 검색 실패: {str(e)}")
+
+@router.post("/admin/search-by-item")
+async def search_by_item(item: str, limit: int = 20):
+    """아이템별 검색 테스트"""
+    print(f"🔍 search_by_item 호출됨: {item}")
+    
+    try:
+        results = fashion_index_service.search_by_item(item, limit)
+        
+        return ResponseModel(
+            success=True,
+            message="아이템별 검색 완료",
+            data={
+                "item": item,
+                "results": results,
+                "count": len(results)
+            }
+        )
+        
+    except Exception as e:
+        print(f"❌ 아이템별 검색 실패: {str(e)}")
+        logger.error(f"아이템별 검색 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"아이템별 검색 실패: {str(e)}")
 
 class SituationsUpdateRequest(BaseModel):
     situations: list

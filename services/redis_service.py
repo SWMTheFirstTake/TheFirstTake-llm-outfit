@@ -138,6 +138,85 @@ class RedisService:
         except Exception as e:
             logger.error(f"최근 사용 아이템 추가 실패: {e}")
             return False
+    
+    # 인덱스 서비스를 위한 추가 메서드들
+    def set_json(self, key: str, data: dict, expire_time: int = 86400) -> bool:
+        """JSON 데이터를 Redis에 저장"""
+        if not self.redis_client:
+            logger.warning("Redis 클라이언트가 연결되지 않았습니다")
+            return False
+        
+        try:
+            json_data = json.dumps(data, ensure_ascii=False)
+            self.redis_client.setex(key, expire_time, json_data)
+            logger.info(f"Redis에 JSON 데이터 저장: {key}")
+            return True
+        except Exception as e:
+            logger.error(f"Redis JSON 데이터 저장 실패: {e}")
+            return False
+    
+    def get_json(self, key: str) -> Optional[dict]:
+        """Redis에서 JSON 데이터 조회"""
+        if not self.redis_client:
+            logger.warning("Redis 클라이언트가 연결되지 않았습니다")
+            return None
+        
+        try:
+            json_data = self.redis_client.get(key)
+            if json_data:
+                return json.loads(json_data)
+            return None
+        except Exception as e:
+            logger.error(f"Redis JSON 데이터 조회 실패: {e}")
+            return None
+    
+    def sadd(self, key: str, *members) -> int:
+        """Set에 멤버 추가"""
+        if not self.redis_client:
+            logger.warning("Redis 클라이언트가 연결되지 않았습니다")
+            return 0
+        
+        try:
+            return self.redis_client.sadd(key, *members)
+        except Exception as e:
+            logger.error(f"Redis Set 추가 실패: {e}")
+            return 0
+    
+    def smembers(self, key: str) -> set:
+        """Set의 모든 멤버 조회"""
+        if not self.redis_client:
+            logger.warning("Redis 클라이언트가 연결되지 않았습니다")
+            return set()
+        
+        try:
+            return self.redis_client.smembers(key)
+        except Exception as e:
+            logger.error(f"Redis Set 조회 실패: {e}")
+            return set()
+    
+    def keys(self, pattern: str) -> list:
+        """패턴에 맞는 키들 조회"""
+        if not self.redis_client:
+            logger.warning("Redis 클라이언트가 연결되지 않았습니다")
+            return []
+        
+        try:
+            return self.redis_client.keys(pattern)
+        except Exception as e:
+            logger.error(f"Redis 키 조회 실패: {e}")
+            return []
+    
+    def delete(self, *keys) -> int:
+        """키들 삭제"""
+        if not self.redis_client:
+            logger.warning("Redis 클라이언트가 연결되지 않았습니다")
+            return 0
+        
+        try:
+            return self.redis_client.delete(*keys)
+        except Exception as e:
+            logger.error(f"Redis 키 삭제 실패: {e}")
+            return 0
 
 # 전역 Redis 서비스 인스턴스
 redis_service = RedisService() 
