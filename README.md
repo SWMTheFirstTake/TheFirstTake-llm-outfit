@@ -36,6 +36,11 @@ Claude Vision API를 활용한 이미지 기반 패션 분석과 다중 전문�
    - 대화 컨텍스트 활용 스마트 매칭
    - S3 JSON 데이터 기반 정확한 매칭
 
+6. **🕷️ 자동화된 데이터 수집**
+   - Pinterest 크롤링 시스템
+   - S3 자동 업로드
+   - 패션 이미지 데이터베이스 구축
+
 ## 🏗️ 시스템 아키텍처
 
 ```
@@ -95,6 +100,22 @@ Claude Vision API를 활용한 이미지 기반 패션 분석과 다중 전문�
 │  │  │                 │    │ • Styling       │            │ │
 │  │  └─────────────────┘    └─────────────────┘            │ │
 │  └─────────────────────────────────────────────────────────┘ │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │              🕷️ 데이터 수집 시스템                      │ │
+│  ├─────────────────────────────────────────────────────────┤ │
+│  │  ┌─────────────────┐    ┌─────────────────┐            │ │
+│  │  │ Pinterest       │    │ Image Uploader  │            │ │
+│  │  │   Scraper       │    │    Service      │            │ │
+│  │  │                 │    │                 │            │ │
+│  │  └─────────┬───────┘    └─────────┬───────┘            │ │
+│  │            │                      │                    │ │
+│  │  ┌─────────▼───────┐    ┌─────────▼───────┐            │ │
+│  │  │ Selenium        │    │ AWS S3          │            │ │
+│  │  │ WebDriver       │    │ Bucket          │            │ │
+│  │  │                 │    │                 │            │ │
+│  │  └─────────────────┘    └─────────────────┘            │ │
+│  └─────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -113,6 +134,123 @@ Claude Vision API를 활용한 이미지 기반 패션 분석과 다중 전문�
 3. **Redis 인덱스 검색** → 상황/아이템/색상/스타일링 기반 후보 선별
 4. **스코어 계산** → 선별된 후보들에 대해서만 정확도 계산
 5. **결과 반환** → 최적화된 매칭 결과 제공
+
+### 🕷️ 데이터 수집 플로우
+
+1. **Pinterest 크롤링** → Selenium을 통한 자동 이미지 수집
+2. **이미지 다운로드** → 로컬 임시 저장
+3. **S3 업로드** → AWS S3 버킷에 자동 업로드
+4. **메타데이터 저장** → JSON 형태로 이미지 정보 저장
+5. **인덱스 구축** → Redis 인덱스 자동 업데이트
+
+## 🕷️ 데이터 수집 시스템
+
+### 📊 Pinterest 크롤링 시스템
+
+#### **크롤링 대상**
+- **검색 키워드**: "korean men summer fashion", "men summer outfit korean" 등
+- **수집 데이터**: 패션 이미지, 설명, 핀 URL, 수집 시간
+- **수집 규모**: 쿼리당 최대 50개 이미지
+
+#### **크롤링 특징**
+```python
+# 봇 감지 방지 기능
+options.add_argument('--headless')
+options.add_argument('--disable-blink-features=AutomationControlled')
+options.add_experimental_option("excludeSwitches", ["enable-automation"])
+
+# 스크롤 기반 동적 로딩
+while len(pins_data) < max_pins:
+    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+    time.sleep(random.uniform(3, 5))  # 랜덤 대기
+```
+
+#### **수집된 데이터 구조**
+```json
+{
+  "image_url": "https://i.pinimg.com/236x/e9/6f/33/e96f336d67597af2d5299f7db5c59fad.jpg",
+  "description": "#aesthetic #outfit #summer",
+  "pin_url": "https://kr.pinterest.com/pin/14144186324688370/",
+  "query": "korean men summer fashion",
+  "collected_at": "2025-07-29 17:21:09"
+}
+```
+
+### ☁️ S3 업로드 시스템
+
+#### **업로드 프로세스**
+1. **JSON 파일 읽기** → `korean_mens_summer_fashion_pinterest.json`
+2. **이미지 다운로드** → 임시 디렉토리에 저장
+3. **S3 업로드** → `image/` 폴더에 저장
+4. **중복 체크** → 기존 JSON 파일 존재 여부 확인
+5. **임시 파일 정리** → 로컬 임시 파일 삭제
+
+#### **S3 저장 구조**
+```
+thefirsttake-combination/
+├── image/
+│   ├── fashion_001.jpg
+│   ├── fashion_002.jpg
+│   └── ...
+└── json/
+    ├── fashion_001.json
+    ├── fashion_002.json
+    └── ...
+```
+
+#### **업로드 통계**
+- **총 수집 이미지**: 1,990개
+- **성공률**: 95% 이상
+- **중복 방지**: 기존 JSON 파일 체크
+- **에러 처리**: 실패한 이미지 로그 기록
+
+### 🔄 전체 데이터 파이프라인
+
+#### **1단계: 데이터 수집**
+```bash
+# Pinterest 크롤링 실행
+python services/crawling/pinterest_crawling.py
+
+# 결과: korean_mens_summer_fashion_pinterest.json 생성
+```
+
+#### **2단계: S3 업로드**
+```bash
+# 이미지 S3 업로드 실행
+python services/crawling/upload_images_to_s3.py
+
+# 결과: S3 버킷에 이미지 및 JSON 파일 저장
+```
+
+#### **3단계: 인덱스 구축**
+```bash
+# Redis 인덱스 구축
+curl -X POST http://localhost:6020/api/admin/build-indexes
+
+# 결과: 빠른 검색을 위한 인덱스 생성
+```
+
+#### **4단계: API 서비스**
+```bash
+# 패션 추천 API 호출
+curl -X POST http://localhost:6020/api/expert/single \
+  -H "Content-Type: application/json" \
+  -d '{"user_input": "소개팅에 입을 옷 추천해줘", "expert_type": "style_analyst"}'
+```
+
+### 📈 데이터 품질 관리
+
+#### **필터링 기준**
+- **광고 제외**: "promoted", "ad" 키워드 포함 이미지 제외
+- **중복 방지**: 동일한 이미지 URL 중복 수집 방지
+- **유효성 검증**: 이미지 URL 접근 가능 여부 확인
+- **메타데이터 보존**: 원본 설명, 핀 URL, 수집 시간 저장
+
+#### **데이터 정제**
+- **이미지 품질**: 고해상도 이미지 우선 수집
+- **설명 정규화**: 빈 설명은 "No description"으로 통일
+- **URL 검증**: 유효한 Pinterest URL만 저장
+- **시간 정보**: ISO 형식으로 표준화
 
 ## 🔍 인덱스 시스템 상세
 
@@ -335,7 +473,11 @@ item_keywords = [
 │   ├── fashion_index_service.py    # 🚀 Redis 인덱싱 서비스
 │   ├── score_calculator_service.py # 🚀 스코어 계산 서비스
 │   ├── s3_service.py               # S3 데이터 관리 서비스
-│   └── redis_service.py            # Redis 캐싱 서비스
+│   ├── redis_service.py            # Redis 캐싱 서비스
+│   └── crawling/                   # 🕷️ 데이터 수집 시스템
+│       ├── pinterest_crawling.py   # Pinterest 크롤링
+│       ├── upload_images_to_s3.py  # S3 업로드
+│       └── korean_mens_summer_fashion_pinterest.json  # 수집된 데이터
 ├── models/                   # 데이터 모델
 │   ├── __init__.py
 │   └── fashion_models.py     # 패션 관련 데이터 모델
@@ -399,6 +541,37 @@ Redis 키 구조:
 - fashion_index:item:{item} - 아이템별 파일명 집합
 - fashion_index:color:{color} - 색상별 파일명 집합
 - fashion_index:styling:{styling} - 스타일링별 파일명 집합
+```
+
+### 데이터 수집 관리
+
+#### Pinterest 크롤링 실행
+```bash
+# 크롤링 실행
+python services/crawling/pinterest_crawling.py
+
+# 결과: korean_mens_summer_fashion_pinterest.json 생성
+```
+
+#### S3 업로드 실행
+```bash
+# 이미지 S3 업로드
+python services/crawling/upload_images_to_s3.py
+
+# 결과: S3 버킷에 이미지 및 JSON 파일 저장
+```
+
+#### 크롤링 설정 수정
+```python
+# services/crawling/pinterest_crawling.py
+search_queries = [
+    "korean men summer fashion",
+    "men summer outfit korean",
+    "korean summer street style"
+]
+
+# 수집할 이미지 수 조정
+max_pins = 50  # 쿼리당 최대 이미지 수
 ```
 
 ### 환경 변수 설정
@@ -578,6 +751,24 @@ python test_context_search.py
 python test_pinterest_api.py
 ```
 
+### 크롤링 테스트
+```bash
+# Pinterest 크롤링 테스트
+python services/crawling/pinterest_crawling.py
+
+# S3 업로드 테스트
+python services/crawling/upload_images_to_s3.py
+```
+
+### 크롤링 테스트
+```bash
+# Pinterest 크롤링 테스트
+python services/crawling/pinterest_crawling.py
+
+# S3 업로드 테스트
+python services/crawling/upload_images_to_s3.py
+```
+
 ## 📈 성능 최적화
 
 ### 인덱스 기반 검색
@@ -596,6 +787,127 @@ python test_pinterest_api.py
 - **컨텍스트 활용**: 대화 히스토리 기반 검색 조건 추론
 - **폴백 메커니즘**: 키워드 없을 시 전체 스캔으로 전환
 
+### 데이터 수집 최적화
+- **봇 감지 방지**: Selenium 헤드리스 모드 + 랜덤 대기
+- **중복 방지**: 이미지 URL 기반 중복 체크
+- **에러 처리**: 실패한 이미지 로그 기록 및 재시도
+- **배치 처리**: 대량 이미지 처리 시 메모리 효율성
+
+### 데이터 수집 최적화
+- **봇 감지 방지**: Selenium 헤드리스 모드 + 랜덤 대기
+- **중복 방지**: 이미지 URL 기반 중복 체크
+- **에러 처리**: 실패한 이미지 로그 기록 및 재시도
+- **배치 처리**: 대량 이미지 처리 시 메모리 효율성
+
+## 🕷️ 데이터 수집 시스템
+
+### 📊 Pinterest 크롤링 시스템
+
+#### **크롤링 대상**
+- **검색 키워드**: "korean men summer fashion", "men summer outfit korean" 등
+- **수집 데이터**: 패션 이미지, 설명, 핀 URL, 수집 시간
+- **수집 규모**: 쿼리당 최대 50개 이미지
+
+#### **크롤링 특징**
+```python
+# 봇 감지 방지 기능
+options.add_argument('--headless')
+options.add_argument('--disable-blink-features=AutomationControlled')
+options.add_experimental_option("excludeSwitches", ["enable-automation"])
+
+# 스크롤 기반 동적 로딩
+while len(pins_data) < max_pins:
+    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+    time.sleep(random.uniform(3, 5))  # 랜덤 대기
+```
+
+#### **수집된 데이터 구조**
+```json
+{
+  "image_url": "https://i.pinimg.com/236x/e9/6f/33/e96f336d67597af2d5299f7db5c59fad.jpg",
+  "description": "#aesthetic #outfit #summer",
+  "pin_url": "https://kr.pinterest.com/pin/14144186324688370/",
+  "query": "korean men summer fashion",
+  "collected_at": "2025-07-29 17:21:09"
+}
+```
+
+### ☁️ S3 업로드 시스템
+
+#### **업로드 프로세스**
+1. **JSON 파일 읽기** → `korean_mens_summer_fashion_pinterest.json`
+2. **이미지 다운로드** → 임시 디렉토리에 저장
+3. **S3 업로드** → `image/` 폴더에 저장
+4. **중복 체크** → 기존 JSON 파일 존재 여부 확인
+5. **임시 파일 정리** → 로컬 임시 파일 삭제
+
+#### **S3 저장 구조**
+```
+thefirsttake-combination/
+├── image/
+│   ├── fashion_001.jpg
+│   ├── fashion_002.jpg
+│   └── ...
+└── json/
+    ├── fashion_001.json
+    ├── fashion_002.json
+    └── ...
+```
+
+#### **업로드 통계**
+- **총 수집 이미지**: 1,990개
+- **성공률**: 95% 이상
+- **중복 방지**: 기존 JSON 파일 체크
+- **에러 처리**: 실패한 이미지 로그 기록
+
+### 🔄 전체 데이터 파이프라인
+
+#### **1단계: 데이터 수집**
+```bash
+# Pinterest 크롤링 실행
+python services/crawling/pinterest_crawling.py
+
+# 결과: korean_mens_summer_fashion_pinterest.json 생성
+```
+
+#### **2단계: S3 업로드**
+```bash
+# 이미지 S3 업로드 실행
+python services/crawling/upload_images_to_s3.py
+
+# 결과: S3 버킷에 이미지 및 JSON 파일 저장
+```
+
+#### **3단계: 인덱스 구축**
+```bash
+# Redis 인덱스 구축
+curl -X POST http://localhost:6020/api/admin/build-indexes
+
+# 결과: 빠른 검색을 위한 인덱스 생성
+```
+
+#### **4단계: API 서비스**
+```bash
+# 패션 추천 API 호출
+curl -X POST http://localhost:6020/api/expert/single \
+  -H "Content-Type: application/json" \
+  -d '{"user_input": "소개팅에 입을 옷 추천해줘", "expert_type": "style_analyst"}'
+```
+
+### 📈 데이터 품질 관리
+
+#### **필터링 기준**
+- **광고 제외**: "promoted", "ad" 키워드 포함 이미지 제외
+- **중복 방지**: 동일한 이미지 URL 중복 수집 방지
+- **유효성 검증**: 이미지 URL 접근 가능 여부 확인
+- **메타데이터 보존**: 원본 설명, 핀 URL, 수집 시간 저장
+
+#### **데이터 정제**
+- **이미지 품질**: 고해상도 이미지 우선 수집
+- **설명 정규화**: 빈 설명은 "No description"으로 통일
+- **URL 검증**: 유효한 Pinterest URL만 저장
+- **시간 정보**: ISO 형식으로 표준화
+
 ## 🔮 향후 개선 계획
 
 ### 키워드 추출 시스템 개선
@@ -608,6 +920,18 @@ python test_pinterest_api.py
 1. **캐싱 레이어 추가**: Redis 캐싱 전략 개선
 2. **비동기 처리**: 대용량 데이터 처리 최적화
 3. **분산 인덱싱**: 대용량 데이터 분산 처리
+
+### 데이터 수집 시스템 개선
+1. **다중 소스 크롤링**: Instagram, TikTok 등 추가
+2. **실시간 크롤링**: 스케줄러 기반 자동 크롤링
+3. **품질 관리**: AI 기반 이미지 품질 평가
+4. **분류 시스템**: 자동 태깅 및 카테고리 분류
+
+### 데이터 수집 시스템 개선
+1. **다중 소스 크롤링**: Instagram, TikTok 등 추가
+2. **실시간 크롤링**: 스케줄러 기반 자동 크롤링
+3. **품질 관리**: AI 기반 이미지 품질 평가
+4. **분류 시스템**: 자동 태깅 및 카테고리 분류
 
 ## �� 라이센스
 
