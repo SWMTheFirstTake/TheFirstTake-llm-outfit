@@ -1289,13 +1289,13 @@ class SimpleFashionExpertService:
 
 **🚨 응답 시작 강제 규칙 (절대 위반 금지):**
 - 첫 문장은 무조건 구체적인 옷 조합으로 시작해야 함
-- "{json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')}랑 {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')}가 잘 어울려" 같은 형태로 시작
+- "{json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')}에 {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')}가 잘 어울려" 같은 형태로 시작
 - "이 옷 조합 좋아", "그 옷 조합 좋아", "저 옷 조합 좋아" 같은 주관적 표현 절대 금지
 - 주관적 판단, 감탄사, 추상적 설명 절대 금지
 - 바로 구체적인 옷 조합 분석으로 시작해야 함
 
 **🔥 핵심 원칙: 첫 문장은 반드시 구체적인 옷 조합으로 시작!**
-- 첫 문장은 무조건 "{json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')}랑 {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')}가 잘 어울려" 같은 형태로 시작
+- 첫 문장은 무조건 "{json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')}에 {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')}가 잘 어울려" 같은 형태로 시작
 - 주관적 판단, 감탄사, 추상적 설명 절대 금지
 - 바로 구체적인 옷 조합 분석으로 시작해야 함
 
@@ -1363,7 +1363,7 @@ class SimpleFashionExpertService:
 위의 구체적인 옷 조합 정보를 바탕으로 간결하고 핵심적인 패션 조언을 제공해주세요. 반드시 응답 시작 부분에 추천하는 옷 조합을 명확하게 명시하고, 반말로 간결하게 응답해주세요."""
         
         # 사용자 프롬프트 (구체적인 옷 조합 강조)
-        user_prompt = f"이 {json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')} + {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')} 조합에 대해 {expert_profile['role']}의 관점에서 반말로 간결하게 조언해주세요. 반드시 첫 문장은 '{json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')}랑 {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')}가 잘 어울려' 같은 형태로 시작하고, 실제 옷 정보를 명확하게 언급해주세요."
+        user_prompt = f"이 {json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')} + {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')} 조합에 대해 {expert_profile['role']}의 관점에서 반말로 간결하게 조언해주세요. 반드시 첫 문장은 '{json_data.get('top', {}).get('color', '')} {json_data.get('top', {}).get('item', '')}에 {json_data.get('bottom', {}).get('color', '')} {json_data.get('bottom', {}).get('item', '')}가 잘 어울려' 같은 형태로 시작하고, 실제 옷 정보를 명확하게 언급해주세요."
         
         try:
             # LLM 호출
