@@ -20,18 +20,20 @@ async def startup_event():
     try:
         from services.fashion_index_service import fashion_index_service
         
-        # 백그라운드에서 인덱스 상태 확인 및 복구
+        # 백그라운드에서 인덱스 상태 확인 및 복구 (서버 시작 지연 방지)
         import threading
-        def check_and_recover():
+        def background_index_check():
             try:
+                logger.info("🔨 백그라운드에서 인덱스 상태 확인 시작...")
                 fashion_index_service._check_and_recover_indexes()
-                logger.info("✅ 인덱스 상태 확인 완료")
+                logger.info("✅ 백그라운드 인덱스 확인 완료")
             except Exception as e:
-                logger.error(f"❌ 인덱스 상태 확인 실패: {e}")
+                logger.error(f"❌ 백그라운드 인덱스 확인 실패: {e}")
         
-        # 별도 스레드에서 실행 (서버 시작 지연 방지)
-        thread = threading.Thread(target=check_and_recover, daemon=True)
-        thread.start()
+        # 데몬 스레드로 실행 (메인 프로세스 종료 시 자동 종료)
+        index_thread = threading.Thread(target=background_index_check, daemon=True)
+        index_thread.start()
+        logger.info("🚀 서버 시작 완료 (인덱스 확인은 백그라운드에서 진행 중)")
         
     except Exception as e:
         logger.error(f"❌ 인덱스 복구 시작 실패: {e}")
