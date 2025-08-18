@@ -31,7 +31,7 @@ class ImprovedPinterestScraper:
         pins_data = []
         seen_urls = set()  # 중복 방지
         scroll_attempts = 0
-        max_scroll_attempts = 20
+        max_scroll_attempts = 30  # 더 많은 스크롤 시도
         no_new_content_count = 0
         
         while len(pins_data) < max_pins and scroll_attempts < max_scroll_attempts:
@@ -70,6 +70,18 @@ class ImprovedPinterestScraper:
                         # Pinterest 광고나 프로모션 이미지 필터링
                         if "promoted" in img_alt.lower() or "ad" in img_alt.lower():
                             continue
+                        
+                        # 여성 관련 키워드 필터링 (남성 패션만 수집)
+                        female_keywords = [
+                            "woman", "women", "girl", "girls", "female", "lady", "ladies",
+                            "여성", "여자", "걸", "레이디", "우먼", "걸스", "여성용",
+                            "dress", "skirt", "heels", "makeup", "nail", "purse", "handbag",
+                            "원피스", "치마", "힐", "메이크업", "네일", "핸드백", "가방"
+                        ]
+                        
+                        # 설명에 여성 관련 키워드가 있으면 건너뛰기
+                        if any(keyword in img_alt.lower() for keyword in female_keywords):
+                            continue
                             
                         try:
                             pin_link = pin.find_element(By.TAG_NAME, "a").get_attribute("href")
@@ -100,7 +112,7 @@ class ImprovedPinterestScraper:
                 no_new_content_count += 1
                 print(f"새 핀 없음 ({no_new_content_count}번째)")
                 
-                if no_new_content_count >= 3:
+                if no_new_content_count >= 5:  # 더 많은 시도 후 중단
                     print("연속으로 새 콘텐츠가 없어서 중단합니다.")
                     break
             else:
@@ -152,53 +164,92 @@ if __name__ == "__main__":
     scraper = ImprovedPinterestScraper()
     
     try:
-        # 다양한 검색어로 분산 수집 (남성 전용)
+        # 한국 남성 패션 전용 검색어 (1000장 수집 목표)
         search_queries = [
-            # "korean men summer fashion",      # 영어 기본
-            # "men summer outfit korean",       # 영어 변형
-            # "korean summer street style",     # 스트릿 스타일
-            # "korean casual summer men",       # 캐주얼 강조
-            # "men summer fashion seoul"        # 서울 패션
-            # "korean men summer style",        # 스타일 강조
-            # "men summer fashion korea",       # 한국 패션
-            # "korean summer men outfit",       # 아웃핏 강조
-            # "korean men casual summer",       # 캐주얼 여름
-            # "men summer street fashion korean", # 스트릿 패션
-            # "korean men summer looks",        # 룩 강조
-            # "men summer style korean fashion", # 패션 스타일
-            # "korean summer men clothing",     # 의류 강조
-            # "men summer outfit ideas korean", # 아웃핏 아이디어
-            # "korean men summer fashion trends", # 트렌드
-            # "men summer casual korean style", # 캐주얼 스타일
-            # "korean summer men streetwear",   # 스트릿웨어
-            # "men summer fashion inspiration korean", # 영감
-            # "korean men summer wardrobe",     # 워드로브
-            # "men summer style inspiration korean", # 스타일 영감
-            # "korean men summer fashion male", # 남성 명시
-            # "men summer outfit korean male",  # 남성 아웃핏
-            # "korean men summer clothing male", # 남성 의류
-            # "men summer style korean male",   # 남성 스타일
-            # "korean men summer fashion guy",  # 남성 패션
-            # "men summer outfit ideas korean male", # 남성 아이디어
-            # "korean men summer fashion boy",  # 남성 패션
-            # "men summer casual korean male",  # 남성 캐주얼
-            # "korean men summer street style male", # 남성 스트릿
-            # "korean men summer fashion male", # 남성 명시
-            # "men summer outfit korean male",  # 남성 아웃핏
-            # "korean men summer clothing male", # 남성 의류
-            # "men summer style korean male",   # 남성 스타일
-            # "korean men summer fashion guy",   # 남성 패션
-            "korea summer street style",        # 한국 여름 스트릿
-            "korea summer business casual",     # 한국 여름 비즈니스 캐주얼
-            "korea summer streetwear",          # 한국 여름 스트릿웨어
-            "korea summer casual style",        # 한국 여름 캐주얼
-            "korea summer fashion trends"       # 한국 여름 패션 트렌드
+            # 기본 남성 패션 검색어
+            "korean men fashion",
+            "korean male style",
+            "korean guy outfit",
+            "korean men streetwear",
+            "korean men casual",
+            "korean men business casual",
+            
+            # 계절별 남성 패션
+            "korean men summer fashion",
+            "korean men winter style",
+            "korean men spring outfit",
+            "korean men fall fashion",
+            
+            # 스타일별 남성 패션
+            "korean men street style",
+            "korean men formal wear",
+            "korean men casual wear",
+            "korean men smart casual",
+            "korean men minimalist fashion",
+            "korean men trendy style",
+            
+            # 연령대별 남성 패션
+            "korean young men fashion",
+            "korean men in 20s style",
+            "korean men in 30s outfit",
+            "korean college men fashion",
+            
+            # 특정 아이템 중심
+            "korean men shirt style",
+            "korean men jacket fashion",
+            "korean men pants outfit",
+            "korean men accessories",
+            
+            # K-pop/연예인 스타일
+            "korean idol men fashion",
+            "kpop men style",
+            "korean actor fashion",
+            "korean celebrity men outfit",
+            
+            # 지역/문화 특화
+            "seoul men fashion",
+            "korean office men style",
+            "korean university men fashion",
+            "korean men daily outfit",
+            
+            # 영어 변형
+            "men fashion korea",
+            "male style korean",
+            "guy outfit korea",
+            "korean masculine style",
+            "korean men clothing",
+            "korean men wardrobe",
+            
+            # 상황별/데이트룩 등
+            "korean men date outfit",
+            "korean men date fashion",
+            "korean guy date look",
+            "korean men romantic style",
+            "korean men dinner date outfit",
+            "korean men casual date look",
+            "korean men weekend outfit",
+            "korean men party style",
+            "korean men night out fashion",
+            "korean men cafe outfit",
+            "korean men movie date style"
         ]
         
-        print("=== 다중 검색어로 패션 이미지 수집 시작 ===")
-        all_pins = scraper.multi_query_search(search_queries, pins_per_query=30)
+        print("=== 1000장 한국 남성 패션 이미지 수집 시작 ===")
+        # 1000장 목표를 위해 검색어당 더 많은 이미지 수집
+        target_total = 1000
+        pins_per_query = max(30, target_total // len(search_queries) + 10)
+        print(f"검색어 {len(search_queries)}개, 검색어당 {pins_per_query}개 목표")
+        
+        all_pins = scraper.multi_query_search(search_queries, pins_per_query=pins_per_query)
         
         print(f"\n🎉 총 {len(all_pins)}개의 고유한 핀을 수집했습니다!")
+        
+        # 목표 달성 여부 확인
+        if len(all_pins) >= target_total:
+            print(f"✅ 목표 {target_total}장 달성! ({len(all_pins)}장 수집)")
+        else:
+            print(f"⚠️ 목표 {target_total}장 중 {len(all_pins)}장 수집 ({len(all_pins)/target_total*100:.1f}%)")
+            print("💡 더 많은 이미지를 원한다면 다시 실행하거나 검색어를 추가해보세요.")
         
         # 결과를 JSON 파일로 저장 (기존 파일이 있으면 추가)
         output_file = "korean_mens_summer_fashion_pinterest.json"

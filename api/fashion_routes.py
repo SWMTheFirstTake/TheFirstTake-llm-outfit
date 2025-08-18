@@ -349,7 +349,8 @@ async def fallback_expert_analysis(request: ExpertAnalysisRequest):
             room_id=request.room_id,
             expert_type=request.expert_type,
             user_profile=request.user_profile,
-            context_info=request.context_info
+            context_info=request.context_info,
+            json_data=request.json_data  # JSON 데이터도 전달
         )
         
         # 전문가 분석 실행
@@ -818,17 +819,69 @@ async def get_index_stats():
     
     try:
         stats = fashion_index_service.get_index_stats()
+        is_healthy = fashion_index_service.is_index_healthy()
         
         return ResponseModel(
             success=True,
             message="인덱스 통계 조회 완료",
-            data=stats
+            data={
+                **stats,
+                "is_healthy": is_healthy,
+                "status": "정상" if is_healthy else "복구 필요"
+            }
         )
         
     except Exception as e:
         print(f"❌ 인덱스 통계 조회 실패: {str(e)}")
         logger.error(f"인덱스 통계 조회 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=f"인덱스 통계 조회 실패: {str(e)}")
+
+@router.post("/admin/check-index-health")
+async def check_index_health():
+    """인덱스 상태 확인 및 필요시 자동 복구"""
+    print("🔍 check_index_health 호출됨")
+    
+    try:
+        is_healthy = fashion_index_service.is_index_healthy()
+        
+        if not is_healthy:
+            # 백그라운드에서 인덱스 재구축 시작
+            import threading
+            
+            def background_rebuild():
+                try:
+                    result = fashion_index_service.build_indexes(force_rebuild=False)
+                    print(f"✅ 자동 인덱스 복구 완료: {result}")
+                except Exception as e:
+                    print(f"❌ 자동 인덱스 복구 실패: {e}")
+            
+            thread = threading.Thread(target=background_rebuild, daemon=True)
+            thread.start()
+            
+            return ResponseModel(
+                success=True,
+                message="인덱스 복구 시작",
+                data={
+                    "is_healthy": False,
+                    "action": "인덱스 복구 시작",
+                    "message": "인덱스 상태가 비정상으로 감지되어 백그라운드에서 복구를 시작했습니다."
+                }
+            )
+        else:
+            return ResponseModel(
+                success=True,
+                message="인덱스 정상",
+                data={
+                    "is_healthy": True,
+                    "action": "정상",
+                    "message": "인덱스 상태가 정상입니다."
+                }
+            )
+            
+    except Exception as e:
+        print(f"❌ 인덱스 상태 확인 실패: {str(e)}")
+        logger.error(f"인덱스 상태 확인 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"인덱스 상태 확인 실패: {str(e)}")
 
 @router.post("/admin/search-by-situation")
 async def search_by_situation(situation: str, limit: int = 20):

@@ -12,6 +12,31 @@ logger = logging.getLogger(__name__)
 # FastAPI 앱 생성
 app = FastAPI(title="Fashion Expert API", version="2.0.0")
 
+# 서버 시작 시 인덱스 상태 확인 및 복구
+@app.on_event("startup")
+async def startup_event():
+    """서버 시작 시 Redis 인덱스 상태 확인 및 자동 복구"""
+    logger.info("🔍 서버 시작 - Redis 인덱스 상태 확인 중...")
+    try:
+        from services.fashion_index_service import fashion_index_service
+        
+        # 백그라운드에서 인덱스 상태 확인 및 복구
+        import threading
+        def check_and_recover():
+            try:
+                fashion_index_service._check_and_recover_indexes()
+                logger.info("✅ 인덱스 상태 확인 완료")
+            except Exception as e:
+                logger.error(f"❌ 인덱스 상태 확인 실패: {e}")
+        
+        # 별도 스레드에서 실행 (서버 시작 지연 방지)
+        thread = threading.Thread(target=check_and_recover, daemon=True)
+        thread.start()
+        
+    except Exception as e:
+        logger.error(f"❌ 인덱스 복구 시작 실패: {e}")
+        # 실패해도 서버는 계속 시작
+
 # CORS 설정 추가
 app.add_middleware(
     CORSMiddleware,

@@ -22,6 +22,7 @@ class ExpertAnalysisRequest(BaseModel):
     user_profile: Optional[Dict] = None
     context_info: Optional[Dict] = None
     json_data: Optional[Dict] = None  # JSON 분석 결과 데이터
+  # Pinterest 트렌드 데이터
 
 class ExpertChainRequest(BaseModel):
     user_input: str

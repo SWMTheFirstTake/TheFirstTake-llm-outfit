@@ -10,3 +10,5 @@ requests
 anthropic>=0.25.0
 python-multipart
 boto3>=1.34.0
+selenium
+beautifulsoup4

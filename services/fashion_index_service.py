@@ -163,8 +163,8 @@ class FashionIndexService:
                 "updated_at": content.get('updated_at', '')
             }
             
-            # Redis에 메타데이터 저장
-            redis_service.set_json(f"{self.metadata_prefix}:{filename}", metadata)
+            # Redis에 메타데이터 저장 (TTL 없이 영구 저장)
+            redis_service.set_json(f"{self.metadata_prefix}:{filename}", metadata, expire_time=0)
             
             # 상황별 인덱스
             for situation in situations:
@@ -454,6 +454,81 @@ class FashionIndexService:
         except Exception as e:
             print(f"❌ 인덱스 통계 조회 실패: {e}")
             return {}
+    
+    def _check_and_recover_indexes(self):
+        """서버 시작 시 인덱스 존재 여부 확인 및 자동 복구"""
+        try:
+            # Redis 연결 확인
+            if not redis_service.redis_client:
+                print("⚠️ Redis 연결 없음 - 인덱스 복구 건너뜀")
+                return
+            
+            # Redis 연결 테스트
+            try:
+                redis_service.redis_client.ping()
+                print("✅ Redis 연결 정상")
+            except Exception as e:
+                print(f"❌ Redis 연결 실패: {e}")
+                return
+            
+            # 인덱스 존재 여부 확인
+            metadata_keys = redis_service.keys(f"{self.metadata_prefix}:*")
+            index_keys = redis_service.keys(f"{self.index_prefix}:*")
+            
+            print(f"🔍 인덱스 상태 확인:")
+            print(f"   - 메타데이터: {len(metadata_keys)}개")
+            print(f"   - 인덱스 키: {len(index_keys)}개")
+            
+            # 복구 조건 확인
+            needs_recovery = False
+            
+            if len(metadata_keys) == 0 and len(index_keys) == 0:
+                print("🆕 처음 실행 - 인덱스 구축 시작")
+                needs_recovery = True
+            elif len(metadata_keys) == 0 and len(index_keys) > 0:
+                print("⚠️ 메타데이터 없음, 인덱스만 존재 - 전체 재구축 필요")
+                needs_recovery = True
+            elif len(index_keys) < len(metadata_keys) * 0.3:
+                print("⚠️ 인덱스 심각 부족 - 복구 필요")
+                needs_recovery = True
+            elif len(metadata_keys) > 0 and len(index_keys) == 0:
+                print("⚠️ 메타데이터 존재하지만 인덱스 없음 - 복구 필요")
+                needs_recovery = True
+            
+            if needs_recovery:
+                print("🔄 인덱스 자동 복구 시작")
+                try:
+                    result = self.build_indexes(force_rebuild=False)
+                    print(f"✅ 자동 인덱스 복구 완료: {result}")
+                except Exception as e:
+                    print(f"❌ 자동 인덱스 복구 실패: {e}")
+                    logger.error(f"자동 인덱스 복구 실패: {e}")
+            else:
+                print("✅ 인덱스 정상 - 복구 불필요")
+                
+        except Exception as e:
+            print(f"❌ 인덱스 상태 확인 실패: {e}")
+            logger.error(f"인덱스 상태 확인 실패: {e}")
+    
+    def is_index_healthy(self) -> bool:
+        """인덱스 상태가 정상인지 확인"""
+        try:
+            metadata_keys = redis_service.keys(f"{self.metadata_prefix}:*")
+            index_keys = redis_service.keys(f"{self.index_prefix}:*")
+            
+            # 메타데이터가 있는데 인덱스가 50% 미만이면 비정상
+            if len(metadata_keys) > 0 and len(index_keys) < len(metadata_keys) * 0.5:
+                return False
+            
+            # 메타데이터가 20개 이상인데 인덱스가 10개 미만이면 비정상
+            if len(metadata_keys) > 20 and len(index_keys) < 10:
+                return False
+                
+            return True
+            
+        except Exception as e:
+            print(f"❌ 인덱스 상태 확인 실패: {e}")
+            return False
 
 # 전역 인스턴스 생성
 fashion_index_service = FashionIndexService() 

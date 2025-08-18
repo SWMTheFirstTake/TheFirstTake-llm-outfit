@@ -148,8 +148,16 @@ class RedisService:
         
         try:
             json_data = json.dumps(data, ensure_ascii=False)
-            self.redis_client.setex(key, expire_time, json_data)
-            logger.info(f"Redis에 JSON 데이터 저장: {key}")
+            
+            if expire_time > 0:
+                # TTL이 설정된 경우
+                self.redis_client.setex(key, expire_time, json_data)
+                logger.info(f"Redis에 JSON 데이터 저장 (TTL: {expire_time}초): {key}")
+            else:
+                # TTL 없이 영구 저장
+                self.redis_client.set(key, json_data)
+                logger.info(f"Redis에 JSON 데이터 영구 저장: {key}")
+            
             return True
         except Exception as e:
             logger.error(f"Redis JSON 데이터 저장 실패: {e}")
@@ -177,7 +185,17 @@ class RedisService:
             return 0
         
         try:
-            return self.redis_client.sadd(key, *members)
+            result = self.redis_client.sadd(key, *members)
+            # 인덱스 키의 경우 TTL 제거 (영구 저장)
+            if "fashion_index:" in key or "fashion_metadata:" in key:
+                # TTL 확인 후 제거
+                ttl = self.redis_client.ttl(key)
+                if ttl > 0:  # TTL이 설정되어 있다면 제거
+                    self.redis_client.persist(key)
+                    logger.info(f"인덱스 키 TTL 제거: {key} (기존 TTL: {ttl}초)")
+                elif ttl == -1:  # 이미 영구 저장
+                    logger.debug(f"인덱스 키 이미 영구 저장: {key}")
+            return result
         except Exception as e:
             logger.error(f"Redis Set 추가 실패: {e}")
             return 0
