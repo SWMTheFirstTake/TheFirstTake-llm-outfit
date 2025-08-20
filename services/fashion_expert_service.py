@@ -1555,7 +1555,7 @@ class SimpleFashionExpertService:
         print(f"🔍 필터링 전: {response}")
         
         # 1단계: 색상 중복 제거 (예: "블랙 블랙" -> "블랙")
-        color_names = ['화이트', '블랙', '네이비', '베이지', '그레이', '브라운', '카키', '블루', '레드', '그린', '옐로우', '핑크', '퍼플']
+        color_names = ['화이트', '블랙', '네이비', '베이지', '그레이', '브라운', '카키', '블루', '그린', '옐로우', '핑크', '퍼플']
         for color in color_names:
             # 같은 색상이 연속으로 반복되는 경우 제거
             response = re.sub(f'{color}\\s+{color}', color, response)
@@ -1623,7 +1623,6 @@ class SimpleFashionExpertService:
         
         # 2. 체크무늬 관련 표현을 단색으로 변경
         check_pattern_replacements = {
-            '레드 체크무늬': '레드',
             '블루 체크무늬': '블루',
             '블랙 체크무늬': '블랙',
             '화이트 체크무늬': '화이트',
@@ -1812,7 +1811,7 @@ class SimpleFashionExpertService:
                          '슬랙스', '팬츠', '바지', '치노', '데님', '트라우저', '반바지', 
                          '재킷', '자켓', '코트', '블레이저']
         
-        colors = ['화이트', '블랙', '네이비', '베이지', '그레이', '브라운', '카키', '블루', '레드', '그린']
+        colors = ['화이트', '블랙', '네이비', '베이지', '그레이', '브라운', '카키', '블루', '그린']
         
         for color in colors:
             for item in clothing_items:
