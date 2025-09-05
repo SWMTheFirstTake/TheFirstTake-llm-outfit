@@ -5,7 +5,8 @@ class ScoreCalculator:
         # 여름 시즌 부적합 아이템
         self.summer_inappropriate_items = [
             "긴팔", "롱슬리브", "긴바지", "롱팬츠",
-            "코트", "패딩", "니트", "스웨터"
+            "코트", "패딩", "니트", "스웨터",
+            "블레이저", "블레이져", "자켓", "재킷"
         ]
 
         # 여름 시즌 적합 아이템
@@ -15,8 +16,14 @@ class ScoreCalculator:
 
         # 소개팅/비즈니스 부적절 아이템
         self.formal_inappropriate_items = [
-            "그래픽", "오버사이즈", "와이드", "맨투맨",
-            "후드티", "크롭", "티셔츠","샌들","슬리퍼"
+            "그래픽", "오버사이즈", "맨투맨",
+            "후드티", "크롭", "티셔츠", "샌들", "슬리퍼",
+            # 하의(반바지/쇼츠) 계열 키워드
+            "반바지", "쇼츠", "하프팬츠", "숏팬츠", "숏츠", "쇼트팬츠",
+            # 부적절한 신발
+            "덩크", "스니커즈", "운동화", "캔버스", "컨버스",
+            # 부적절한 색상
+            "오렌지", "핑크", "퍼플", "그린", "옐로우", "레드", "빨강"
         ]
 
         # 상황별 키워드 매핑
@@ -96,9 +103,10 @@ class ScoreCalculator:
         top_color = extracted_items.get("top", {}).get("color", "").lower()
         bottom_color = extracted_items.get("bottom", {}).get("color", "").lower()
 
-        # 화이트+화이트 조합 감점
-        if top_color == "화이트" and bottom_color == "화이트":
-            score -= 0.4
+        # 같은 색 상하의 조합 감점 (모든 색상에 적용)
+        if top_color and bottom_color and top_color == bottom_color:
+            score -= 0.8  # 큰 감점
+            print(f"⚠️ 같은 색 조합 감점: {top_color} + {bottom_color} (-0.8점)")
 
         return score
 
@@ -225,25 +233,40 @@ class ScoreCalculator:
             
             # 소개팅/비즈니스에 부적절한 아이템들
             formal_inappropriate_items = [
-                "그래픽", "오버사이즈", "와이드", "맨투맨", "후드티", "크롭", 
-                "티셔츠", "후드", "스웨트", "트레이닝", "운동복", "반바지", "쇼츠", "하프팬츠", "숏팬츠"
+                "그래픽", "오버사이즈", "맨투맨", "후드티", "크롭", 
+                "티셔츠", "후드", "스웨트", "트레이닝", "운동복",
+                # 하의(반바지/쇼츠) 계열 키워드(동의어 포함)
+                "반바지", "쇼츠", "하프팬츠", "숏팬츠", "숏츠", "쇼트팬츠"
             ]
             
-            # 상의에서 부적절한 아이템 체크 (공백 제거)
-            top_item_no_space = top_item.replace(" ", "")
-            for item in formal_inappropriate_items:
-                if item in top_item_no_space:
-                    penalty -= 0.8  # 큰 감점
-                    print(f"⚠️ 소개팅/비즈니스에 부적절한 상의 발견: {item} (-0.8점)")
-                    break
+            # 자켓/블레이저와 반바지 조합은 격식 상황에 부적절
+            jacket_keywords = ["자켓", "재킷", "블레이저", "블레이져", "재킷"]
+            shorts_keywords = ["반바지", "쇼츠", "하프팬츠", "숏팬츠", "숏츠", "쇼트팬츠"]
             
-            # 하의에서 부적절한 아이템 체크 (공백 제거)
+            top_item_no_space = top_item.replace(" ", "")
             bottom_item_no_space = bottom_item.replace(" ", "")
-            for item in formal_inappropriate_items:
-                if item in bottom_item_no_space:
-                    penalty -= 0.6  # 중간 감점
-                    print(f"⚠️ 소개팅/비즈니스에 부적절한 하의 발견: {item} (-0.6점)")
-                    break
+            
+            has_jacket = any(k in top_item_no_space for k in jacket_keywords)
+            has_shorts = any(k in bottom_item_no_space for k in shorts_keywords)
+            
+            # 자켓+반바지 조합은 격식 상황에 매우 부적절 - 완전 제외
+            if has_jacket and has_shorts:
+                penalty -= 10.0  # 완전 제외를 위한 최대 감점
+                print(f"🚫 소개팅/비즈니스에 부적절한 조합(자켓+반바지) 완전 제외 (-10.0점)")
+            else:
+                # 상의에서 부적절한 아이템 체크
+                for item in formal_inappropriate_items:
+                    if item in top_item_no_space:
+                        penalty -= 0.8  # 큰 감점
+                        print(f"⚠️ 소개팅/비즈니스에 부적절한 상의 발견: {item} (-0.8점)")
+                        break
+                
+                # 하의에서 부적절한 아이템 체크
+                for item in formal_inappropriate_items:
+                    if item in bottom_item_no_space:
+                        penalty -= 0.6  # 중간 감점
+                        print(f"⚠️ 소개팅/비즈니스에 부적절한 하의 발견: {item} (-0.6점)")
+                        break
         
         return penalty
 

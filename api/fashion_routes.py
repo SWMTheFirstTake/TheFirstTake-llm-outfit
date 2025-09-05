@@ -53,7 +53,40 @@ except Exception as e:
 # 라우터 생성
 router = APIRouter(prefix="/api", tags=["fashion"])
 
-@router.get("/health")
+@router.get("/",
+            summary="API 환영 메시지",
+            description="TheFirstTake LLM Outfit API의 환영 메시지와 기본 정보를 제공합니다.",
+            tags=["기본"])
+async def root():
+    """루트 경로 - 간단한 테스트 페이지"""
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>패션 API 테스트</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            .container { max-width: 600px; margin: 0 auto; }
+            .btn { background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 5px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🎨 패션 API 서버</h1>
+            <p>서버가 정상적으로 실행 중입니다!</p>
+            <a href="/test" class="btn">SSE 스트리밍 테스트</a>
+            <a href="/health" class="btn">서버 상태 확인</a>
+        </div>
+    </body>
+    </html>
+    """
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html_content)
+
+@router.get("/health",
+            summary="헬스 체크",
+            description="API 서버의 상태를 확인합니다. 서비스 정상 작동 여부와 기본 정보를 반환합니다.",
+            tags=["기본"])
 def health_check():
     return ResponseModel(
         success=True,
@@ -61,7 +94,10 @@ def health_check():
         data={"service": "fashion_expert_system"}
     )
 
-@router.post("/expert/single")
+@router.post("/expert/single", 
+             summary="고성능 단일 전문가 매칭",
+             description="Redis 인덱싱 기반 S3 착장 매칭으로 초고속 패션 추천을 제공합니다. 상황별/아이템별/색상별 스마트 필터링이 적용됩니다.",
+             tags=["패션 추천"])
 async def single_expert_analysis(request: ExpertAnalysisRequest):
     """단일 전문가 분석 - S3 JSON 파일 기반 매칭"""
     print(f"🔍 single_expert_analysis 호출됨: {request.expert_type.value}")
@@ -514,7 +550,10 @@ async def vision_status():
     )
 
 # ✅ 이미지 분석 API (S3 링크 기반)
-@router.post("/vision/analyze-outfit")
+@router.post("/vision/analyze-outfit",
+             summary="Claude Vision 착장 분석",
+             description="S3 이미지 링크를 기반으로 Claude Vision API를 활용한 착장 분석을 제공합니다. 패션 데이터 매칭과 함께 상세한 스타일 분석을 제공합니다.",
+             tags=["비전 분석"])
 async def analyze_outfit(request: ImageAnalysisRequest):
     """S3 이미지 링크 기반 착장 분석 API (패션 데이터 매칭 포함)"""
     
@@ -541,7 +580,10 @@ async def analyze_outfit(request: ImageAnalysisRequest):
         raise HTTPException(status_code=500, detail=f"분석 실패: {str(e)}")
 
 # ✅ S3 이미지 업로드 API (단일 파일)
-@router.post("/vision/upload-image")
+@router.post("/vision/upload-image",
+             summary="S3 이미지 업로드 (단일)",
+             description="단일 이미지 파일을 S3 버킷에 업로드합니다. 업로드된 이미지는 착장 분석 API에서 사용할 수 있습니다.",
+             tags=["파일 관리", "S3"])
 async def upload_image_to_s3(file: UploadFile = File(...)):
     """이미지를 S3에 업로드하는 API (단일 파일)"""
     
@@ -673,7 +715,10 @@ async def upload_images_to_s3(files: list[UploadFile] = File(...)):
         raise HTTPException(status_code=500, detail=f"업로드 실패: {str(e)}")
 
 # ✅ 배치 이미지 분석 API
-@router.post("/vision/batch-analyze")
+@router.post("/vision/batch-analyze",
+             summary="S3 이미지 일괄 분석",
+             description="S3의 /image 디렉토리에서 JSON 파일이 없는 이미지들을 일괄적으로 Claude Vision API로 분석합니다.",
+             tags=["비전 분석", "배치 처리"])
 async def batch_analyze_images():
     """S3의 /image 디렉토리에서 JSON이 없는 이미지들을 일괄 분석"""
     
@@ -767,7 +812,10 @@ async def get_json_content(filename: str):
         logger.error(f"JSON 파일 내용 조회 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=f"JSON 파일 내용 조회 실패: {str(e)}")
 
-@router.post("/admin/build-indexes")
+@router.post("/admin/build-indexes",
+             summary="패션 데이터 인덱스 구축",
+             description="Redis에 패션 데이터 인덱스를 구축합니다. 상황별/아이템별/색상별/스타일링별 인덱스를 생성하여 고성능 검색을 지원합니다.",
+             tags=["관리자", "인덱스"])
 async def build_fashion_indexes(force_rebuild: bool = False):
     """패션 데이터 인덱스 구축"""
     print(f"🔍 build_fashion_indexes 호출됨 (force_rebuild: {force_rebuild})")
@@ -812,7 +860,10 @@ async def rebuild_fashion_indexes():
         logger.error(f"인덱스 재구축 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=f"인덱스 재구축 실패: {str(e)}")
 
-@router.get("/admin/index-stats")
+@router.get("/admin/index-stats",
+            summary="인덱스 통계 정보 조회",
+            description="Redis 인덱스의 통계 정보를 조회합니다. 인덱스된 파일 수, 키워드별 분포, 메모리 사용량 등을 확인할 수 있습니다.",
+            tags=["관리자", "인덱스"])
 async def get_index_stats():
     """인덱스 통계 정보 조회"""
     print("🔍 get_index_stats 호출됨")
@@ -883,7 +934,10 @@ async def check_index_health():
         logger.error(f"인덱스 상태 확인 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=f"인덱스 상태 확인 실패: {str(e)}")
 
-@router.post("/admin/search-by-situation")
+@router.post("/admin/search-by-situation",
+             summary="상황별 검색 테스트",
+             description="특정 상황(소개팅, 비즈니스, 일상 등)에 맞는 착장을 검색합니다. 인덱스 기반 고성능 검색을 테스트할 수 있습니다.",
+             tags=["관리자", "검색 테스트"])
 async def search_by_situation(situation: str, limit: int = 20):
     """상황별 검색 테스트"""
     print(f"🔍 search_by_situation 호출됨: {situation}")
@@ -906,7 +960,10 @@ async def search_by_situation(situation: str, limit: int = 20):
         logger.error(f"상황별 검색 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=f"상황별 검색 실패: {str(e)}")
 
-@router.post("/admin/search-by-item")
+@router.post("/admin/search-by-item",
+             summary="아이템별 검색 테스트",
+             description="특정 아이템(니트, 데님, 셔츠 등)이 포함된 착장을 검색합니다. 인덱스 기반 고성능 검색을 테스트할 수 있습니다.",
+             tags=["관리자", "검색 테스트"])
 async def search_by_item(item: str, limit: int = 20):
     """아이템별 검색 테스트"""
     print(f"🔍 search_by_item 호출됨: {item}")
@@ -1068,3 +1125,428 @@ async def analyze_outfit_upload(file: UploadFile = File(...)):
         print(f"❌ 에러 발생: {str(e)}")
         logger.error(f"이미지 분석 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=f"분석 실패: {str(e)}")
+
+@router.post("/expert/single/stream",
+             summary="SSE 스트리밍 단일 전문가 매칭",
+             description="실시간 진행 상황을 SSE로 전송하며 패션 추천을 제공합니다. 14단계 진행 상황과 전문가 분석을 실시간으로 확인할 수 있습니다.",
+             tags=["패션 추천", "스트리밍"])
+async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
+    """단일 전문가 분석 - SSE 스트리밍 방식"""
+    from fastapi.responses import StreamingResponse
+    import json
+    
+    # 디버깅: 요청 데이터 로깅
+    print(f"🔍 SSE 스트리밍 요청 받음:")
+    print(f"   - user_input: {request.user_input}")
+    print(f"   - expert_type: {request.expert_type}")
+    print(f"   - room_id: {request.room_id}")
+    print(f"   - user_profile: {request.user_profile}")
+    
+    async def generate_stream():
+        try:
+            # 1단계: 매칭 시작 알림
+            yield f"data: {json.dumps({'type': 'status', 'message': '착장 매칭 시작...', 'step': 1})}\n\n"
+            
+            # S3에서 매칭되는 착장 찾기
+            yield f"data: {json.dumps({'type': 'status', 'message': 'S3에서 착장 검색 중...', 'step': 2})}\n\n"
+            
+            matching_result = outfit_matcher_service.find_matching_outfits_from_s3(
+                request.user_input, request.expert_type.value, request.room_id
+            )
+            
+            if not matching_result:
+                yield f"data: {json.dumps({'type': 'status', 'message': 'S3 매칭 실패, 기존 방식으로 전환...', 'step': 3})}\n\n"
+                # fallback 로직으로 전환
+                fallback_result = await fallback_expert_analysis(request)
+                yield f"data: {json.dumps({'type': 'complete', 'data': fallback_result.dict()})}\n\n"
+                return
+            
+            if not matching_result['matches']:
+                yield f"data: {json.dumps({'type': 'status', 'message': '매칭 점수가 낮아 최고 점수 착장 선택...', 'step': 4})}\n\n"
+                # 기존 로직과 동일한 fallback 처리
+                all_outfits = []
+                for file_info in matching_result.get('all_files', []):
+                    try:
+                        json_content = s3_service.get_json_content(file_info['filename'])
+                        match_score = outfit_matcher_service.score_calculator.calculate_match_score(
+                            request.user_input, json_content, request.expert_type.value
+                        )
+                        all_outfits.append({
+                            'filename': file_info['filename'],
+                            'content': json_content,
+                            'score': match_score,
+                            's3_url': file_info['s3_url']
+                        })
+                    except Exception as e:
+                        continue
+                
+                if all_outfits:
+                    all_outfits.sort(key=lambda x: x['score'], reverse=True)
+                    selected_match = all_outfits[0]
+                    yield f"data: {json.dumps({'type': 'status', 'message': f'최고 점수 착장 선택: {selected_match["filename"]}', 'step': 5})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'status', 'message': '매칭할 수 있는 착장이 없어 fallback으로 전환...', 'step': 6})}\n\n"
+                    fallback_result = await fallback_expert_analysis(request)
+                    yield f"data: {json.dumps({'type': 'complete', 'data': fallback_result.dict()})}\n\n"
+                    return
+            else:
+                yield f"data: {json.dumps({'type': 'status', 'message': f'S3 매칭 성공: {len(matching_result["matches"])}개 착장 발견', 'step': 7})}\n\n"
+                
+                # 기존 로직과 동일한 선택 로직
+                import random
+                top_matches = matching_result['matches']
+                selection_pool = top_matches[:min(20, len(top_matches))]
+                
+                recent_used = redis_service.get_recent_used_outfits(request.room_id, limit=20)
+                if not recent_used:
+                    recent_used = []
+                
+                available_matches = [match for match in selection_pool 
+                                   if match['filename'] not in recent_used]
+                
+                if len(available_matches) < 3:
+                    yield f"data: {json.dumps({'type': 'status', 'message': '선택 풀 부족, 전체 DB에서 랜덤 선택...', 'step': 8})}\n\n"
+                    all_files = matching_result.get('all_files', [])
+                    unused_files = [f for f in all_files if f['filename'] not in recent_used]
+                    
+                    if unused_files:
+                        random_additional = random.sample(unused_files, min(10, len(unused_files)))
+                        for file_info in random_additional:
+                            try:
+                                json_content = s3_service.get_json_content(file_info['filename'])
+                                match_score = outfit_matcher_service.score_calculator.calculate_match_score(
+                                    request.user_input, json_content, request.expert_type.value
+                                )
+                                available_matches.append({
+                                    'filename': file_info['filename'],
+                                    'content': json_content,
+                                    'score': match_score,
+                                    's3_url': file_info['s3_url']
+                                })
+                            except Exception as e:
+                                continue
+                
+                # 최종 선택
+                if available_matches:
+                    selected_match = random.choice(available_matches)
+                    yield f"data: {json.dumps({'type': 'status', 'message': f'최종 착장 선택: {selected_match["filename"]}', 'step': 9})}\n\n"
+                else:
+                    selected_match = random.choice(selection_pool)
+                    yield f"data: {json.dumps({'type': 'status', 'message': f'필터링 후 후보 없음, 전체에서 선택: {selected_match["filename"]}', 'step': 10})}\n\n"
+                
+                # Redis에 최근 사용 추가
+                recent_used.append(selected_match['filename'])
+                if len(recent_used) > 20:
+                    recent_used.pop(0)
+                redis_service.set_recent_used_outfits(request.room_id, recent_used)
+            
+            # 2단계: 전문가 분석 시작
+            yield f"data: {json.dumps({'type': 'status', 'message': '전문가 분석 시작...', 'step': 11})}\n\n"
+            
+            # 선택된 착장 정보 추출
+            content = selected_match['content']
+            extracted_items = content.get('extracted_items', {})
+            situations = content.get('situations', [])
+            
+            # JSON 데이터를 전문가 서비스로 전달하여 스트리밍 응답 생성
+            expert_service = get_fashion_expert_service()
+            if expert_service:
+                request.json_data = extracted_items
+                yield f"data: {json.dumps({'type': 'status', 'message': 'Claude API 호출 중...', 'step': 12})}\n\n"
+                
+                # 스트리밍 전문가 분석 호출
+                async for chunk in expert_service.get_single_expert_analysis_stream(request):
+                    yield f"data: {json.dumps({'type': 'content', 'chunk': chunk})}\n\n"
+                
+                yield f"data: {json.dumps({'type': 'status', 'message': '전문가 분석 완료', 'step': 13})}\n\n"
+            else:
+                # 전문가 서비스가 없으면 기존 방식 사용
+                response = generate_concise_response(extracted_items, situations, request.expert_type.value, selected_match['s3_url'])
+                yield f"data: {json.dumps({'type': 'content', 'chunk': response})}\n\n"
+                yield f"data: {json.dumps({'type': 'status', 'message': '기존 방식 사용 완료', 'step': 14})}\n\n"
+            
+            # Redis에 분석 결과 추가
+            analysis_content = f"[{request.expert_type.value}] S3 매칭 결과: {selected_match['filename']}"
+            redis_service.append_prompt(request.room_id, analysis_content)
+            
+            # 최종 완료 메시지
+            final_data = {
+                "matched_outfit": {
+                    "filename": selected_match['filename'],
+                    "score": selected_match['score'],
+                    "s3_url": selected_match['s3_url'],
+                    "situations": situations
+                },
+                "total_matches": matching_result['matching_count'],
+                "search_method": matching_result.get('search_method', 'N/A'),
+                "source": "s3_json_stream"
+            }
+            
+            yield f"data: {json.dumps({'type': 'complete', 'data': final_data})}\n\n"
+            
+        except Exception as e:
+            error_msg = f"스트리밍 분석 실패: {str(e)}"
+            logger.error(error_msg)
+            yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
+    
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream",
+        }
+    )
+
+@router.get("/test")
+async def test_page():
+    """테스트용 HTML 페이지"""
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>패션 추천 SSE 스트리밍 테스트</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+                background-color: #f5f5f5;
+            }
+            .container {
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            h1 {
+                color: #333;
+                text-align: center;
+                margin-bottom: 30px;
+            }
+            .form-group {
+                margin-bottom: 20px;
+            }
+            label {
+                display: block;
+                margin-bottom: 5px;
+                font-weight: bold;
+                color: #555;
+            }
+            input, select, textarea {
+                width: 100%;
+                padding: 12px;
+                border: 2px solid #ddd;
+                border-radius: 5px;
+                font-size: 16px;
+                box-sizing: border-box;
+            }
+            input:focus, select:focus, textarea:focus {
+                outline: none;
+                border-color: #007bff;
+            }
+            button {
+                background: #007bff;
+                color: white;
+                padding: 12px 30px;
+                border: none;
+                border-radius: 5px;
+                font-size: 16px;
+                cursor: pointer;
+                width: 100%;
+                margin-bottom: 20px;
+            }
+            button:hover {
+                background: #0056b3;
+            }
+            button:disabled {
+                background: #ccc;
+                cursor: not-allowed;
+            }
+            .stream-container {
+                background: #f8f9fa;
+                border: 2px solid #e9ecef;
+                border-radius: 5px;
+                padding: 20px;
+                margin-top: 20px;
+                min-height: 200px;
+                max-height: 400px;
+                overflow-y: auto;
+            }
+            .status-message {
+                color: #007bff;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+            .content-chunk {
+                color: #333;
+                margin-bottom: 5px;
+                line-height: 1.6;
+            }
+            .error-message {
+                color: #dc3545;
+                font-weight: bold;
+            }
+            .complete-message {
+                color: #28a745;
+                font-weight: bold;
+                margin-top: 20px;
+                padding: 15px;
+                background: #d4edda;
+                border-radius: 5px;
+            }
+            .step-indicator {
+                display: inline-block;
+                background: #007bff;
+                color: white;
+                border-radius: 50%;
+                width: 20px;
+                height: 20px;
+                text-align: center;
+                line-height: 20px;
+                font-size: 12px;
+                margin-right: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🎨 패션 추천 SSE 스트리밍 테스트</h1>
+            
+            <form id="fashionForm">
+                <div class="form-group">
+                    <label for="userInput">패션 질문:</label>
+                    <textarea id="userInput" rows="3" placeholder="예: 여름에 데이트할 때 입을 옷 추천해줘" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="expertType">전문가 유형:</label>
+                    <select id="expertType" required>
+                        <option value="style_analyst">스타일 분석가</option>
+                        <option value="color_expert">컬러 전문가</option>
+                        <option value="trend_expert">트렌드 전문가</option>
+                        <option value="fitting_coordinator">코디네이터</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="roomId">방 ID:</label>
+                    <input type="number" id="roomId" value="1" min="1" required>
+                </div>
+                
+                <button type="submit" id="submitBtn">🚀 패션 추천 시작</button>
+            </form>
+            
+            <div class="stream-container" id="streamContainer" style="display: none;">
+                <div id="streamContent"></div>
+            </div>
+        </div>
+
+        <script>
+            let eventSource = null;
+            
+            document.getElementById('fashionForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const submitBtn = document.getElementById('submitBtn');
+                const streamContainer = document.getElementById('streamContainer');
+                const streamContent = document.getElementById('streamContent');
+                
+                // UI 초기화
+                submitBtn.disabled = true;
+                submitBtn.textContent = '🔄 처리 중...';
+                streamContainer.style.display = 'block';
+                streamContent.innerHTML = '<div class="status-message">연결 중...</div>';
+                
+                // 기존 연결 종료
+                if (eventSource) {
+                    eventSource.close();
+                }
+                
+                try {
+                    // API 호출
+                    const response = await fetch('/api/expert/single/stream', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            user_input: document.getElementById('userInput').value,
+                            expert_type: document.getElementById('expertType').value,
+                            room_id: parseInt(document.getElementById('roomId').value)
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    // SSE 스트림 처리
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\\n');
+                        
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(line.slice(6));
+                                    handleStreamData(data);
+                                } catch (parseError) {
+                                    console.error('JSON 파싱 오류:', parseError);
+                                }
+                            }
+                        }
+                    }
+                    
+                } catch (error) {
+                    console.error('스트리밍 오류:', error);
+                    streamContent.innerHTML += `<div class="error-message">❌ 오류 발생: ${error.message}</div>`;
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '🚀 패션 추천 시작';
+                }
+            });
+            
+            function handleStreamData(data) {
+                const streamContent = document.getElementById('streamContent');
+                
+                switch (data.type) {
+                    case 'status':
+                        const stepIndicator = `<span class="step-indicator">${data.step}</span>`;
+                        streamContent.innerHTML += `<div class="status-message">${stepIndicator}${data.message}</div>`;
+                        break;
+                        
+                    case 'content':
+                        streamContent.innerHTML += `<div class="content-chunk">${data.chunk}</div>`;
+                        break;
+                        
+                    case 'complete':
+                        streamContent.innerHTML += `<div class="complete-message">✅ 분석 완료!</div>`;
+                        // 완료된 데이터를 콘솔에 출력
+                        console.log('완료된 데이터:', data.data);
+                        break;
+                        
+                    case 'error':
+                        streamContent.innerHTML += `<div class="error-message">❌ ${data.message}</div>`;
+                        break;
+                }
+                
+                // 자동 스크롤
+                streamContent.scrollTop = streamContent.scrollHeight;
+            }
+        </script>
+    </body>
+    </html>
+    """
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html_content)

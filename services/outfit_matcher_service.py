@@ -2,6 +2,7 @@ from services.s3_service import s3_service
 from services.score_calculator_service import ScoreCalculator
 from services.fashion_index_service import fashion_index_service
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +42,34 @@ class OutfitMatcherService:
     def _find_matching_with_index(self, user_input: str, expert_type: str, room_id: int = None) -> dict:
         """인덱스 기반 빠른 검색"""
         try:
+            # 소개팅/비즈니스 등 격식 상황인지 판별
+            formal_keywords = ["소개팅", "데이트", "면접", "출근", "비즈니스", "회사", "미팅", "회의", "오피스"]
+            is_formal_occasion = any(k in user_input for k in formal_keywords)
+            shorts_keywords = ["반바지", "쇼츠", "하프팬츠", "숏팬츠", "숏츠", "쇼트팬츠"]
+
             # 사용자 입력에서 검색 조건 추출 (대화 컨텍스트 활용)
             search_criteria = self._extract_search_criteria(user_input, room_id)
             print(f"🔍 검색 조건: {search_criteria}")
             
             # 인덱스에서 후보 파일들 찾기
             candidate_files = self._find_candidates_with_index(search_criteria)
+            print(f"📁 인덱스에서 {len(candidate_files)}개 후보 파일 발견")
+
+            # 후보가 너무 적으면 S3 전체에서 보조 풀 추가로 다양성 확보
+            all_files_pool = list(candidate_files)
+            try:
+                if len(candidate_files) < 10:
+                    s3_all = s3_service.list_json_files() or []
+                    # 이미 포함된 파일 제외
+                    existing = {f['filename'] for f in candidate_files}
+                    extras = [f for f in s3_all if f.get('filename') not in existing]
+                    # 최대 30개 보조 풀 추가
+                    random.shuffle(extras)
+                    extras = extras[:30]
+                    all_files_pool.extend(extras)
+                    print(f"🎯 후보 부족으로 S3 보조 풀 추가: +{len(extras)}개 (총 {len(all_files_pool)}개)")
+            except Exception as e:
+                print(f"⚠️ 보조 풀 생성 중 오류: {e}")
             print(f"📁 인덱스에서 {len(candidate_files)}개 후보 파일 발견")
             
             if not candidate_files:
@@ -73,7 +96,45 @@ class OutfitMatcherService:
                     if i < 5:
                         print(f"   📊 {file_info['filename']}: {match_score:.4f}")
                     
-                    if match_score > 0.05:
+                    # 격식 상황에서는 반바지/쇼츠 계열 아웃핏을 하드 필터링
+                    if is_formal_occasion:
+                        extracted_items = json_content.get('extracted_items', {})
+                        top_item = (extracted_items.get('top', {}) or {}).get('item', '').replace(' ', '')
+                        bottom_item = (extracted_items.get('bottom', {}) or {}).get('item', '').replace(' ', '')
+                        shoes_item = (extracted_items.get('shoes', {}) or {}).get('item', '').replace(' ', '')
+                        
+                        # 자켓/블레이저와 반바지 조합은 격식 상황에 부적절 - 엄격하게 제외
+                        jacket_keywords = ["자켓", "재킷", "블레이저", "블레이져", "재킷"]
+                        has_jacket = any(k in top_item for k in jacket_keywords)
+                        has_shorts = any(k in bottom_item for k in shorts_keywords)
+                        
+                        # 부적절한 신발 체크
+                        inappropriate_shoes = ["덩크", "스니커즈", "운동화", "캔버스", "컨버스"]
+                        has_inappropriate_shoes = any(k in shoes_item for k in inappropriate_shoes)
+                        
+                        # 자켓+반바지 조합은 완전히 제외
+                        if has_jacket and has_shorts:
+                            print(f"🚫 격식 상황 부적절 조합(자켓+반바지) 완전 제외: {file_info['filename']}")
+                            continue
+                        # 반바지만 있어도 제외
+                        elif has_shorts:
+                            print(f"🚫 격식 상황 하의(반바지/쇼츠) 제외: {file_info['filename']}")
+                            continue
+                        # 부적절한 신발이 있어도 제외
+                        elif has_inappropriate_shoes:
+                            print(f"🚫 격식 상황 부적절 신발 제외: {file_info['filename']}")
+                            continue
+                    
+                    # 같은 색 상하의 조합 필터링
+                    extracted_items = json_content.get('extracted_items', {})
+                    top_color = (extracted_items.get('top', {}) or {}).get('color', '').lower()
+                    bottom_color = (extracted_items.get('bottom', {}) or {}).get('color', '').lower()
+                    
+                    if top_color and bottom_color and top_color == bottom_color:
+                        print(f"🚫 같은 색 조합 제외: {top_color} + {bottom_color} - {file_info['filename']}")
+                        continue
+
+                    if match_score > 0.02:
                         matching_outfits.append({
                             'filename': file_info['filename'],
                             'content': json_content,
@@ -85,7 +146,7 @@ class OutfitMatcherService:
                     print(f"❌ 후보 파일 분석 실패: {file_info['filename']} - {e}")
                     continue
             
-            print(f"📊 점수 계산 완료: {scored_candidates}/{total_candidates}개 파일, {len(matching_outfits)}개 매칭 (점수 > 0.05)")
+            print(f"📊 점수 계산 완료: {scored_candidates}/{total_candidates}개 파일, {len(matching_outfits)}개 매칭 (점수 > 0.02)")
             
             # 점수순으로 정렬
             matching_outfits.sort(key=lambda x: x['score'], reverse=True)
@@ -99,7 +160,7 @@ class OutfitMatcherService:
             
             return {
                 'matches': top_matches,
-                'all_files': candidate_files,
+                'all_files': all_files_pool,
                 'total_files': len(candidate_files),
                 'matching_count': len(matching_outfits),
                 'search_method': 'index'
@@ -131,7 +192,7 @@ class OutfitMatcherService:
                     # 매칭 점수 계산
                     match_score = self.score_calculator.calculate_match_score(user_input, json_content, expert_type)
                     
-                    if match_score > 0.05:
+                    if match_score > 0.02:
                         matching_outfits.append({
                             'filename': file_info['filename'],
                             'content': json_content,

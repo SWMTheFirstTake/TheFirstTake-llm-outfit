@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import logging
 from api.fashion_routes import router
 import os
@@ -11,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 # FastAPI 앱 생성
 app = FastAPI(title="Fashion Expert API", version="2.0.0")
+
+# 정적 파일 서빙 설정
+app.mount("/html", StaticFiles(directory=".", html=True), name="static")
 
 # 서버 시작 시 인덱스 상태 확인 및 복구
 @app.on_event("startup")

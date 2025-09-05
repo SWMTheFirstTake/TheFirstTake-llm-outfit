@@ -139,6 +139,32 @@ class RedisService:
             logger.error(f"최근 사용 아이템 추가 실패: {e}")
             return False
     
+    def set_recent_used_outfits(self, room_id: int, filenames: list) -> bool:
+        """최근 사용된 아이템 목록을 한 번에 설정"""
+        if not self.redis_client:
+            logger.warning("Redis 클라이언트가 연결되지 않았습니다")
+            return False
+        
+        try:
+            key = f"{room_id}:recent_outfits"
+            
+            # 기존 목록 삭제
+            self.redis_client.delete(key)
+            
+            if filenames:
+                # 새로운 목록을 한 번에 추가
+                self.redis_client.rpush(key, *filenames)
+                
+                # 4시간 만료
+                self.redis_client.expire(key, 14400)
+                
+                logger.info(f"최근 사용 아이템 목록 설정: {room_id} = {len(filenames)}개")
+            
+            return True
+        except Exception as e:
+            logger.error(f"최근 사용 아이템 목록 설정 실패: {e}")
+            return False
+
     # 인덱스 서비스를 위한 추가 메서드들
     def set_json(self, key: str, data: dict, expire_time: int = 86400) -> bool:
         """JSON 데이터를 Redis에 저장"""

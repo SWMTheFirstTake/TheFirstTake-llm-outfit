@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>패션 추천 SSE 스트리밍 테스트</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .stream-container {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status-message {
+            color: #007bff;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .content-chunk {
+            color: #333;
+            margin-bottom: 5px;
+            line-height: 1.6;
+        }
+        .error-message {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .complete-message {
+            color: #28a745;
+            font-weight: bold;
+            margin-top: 20px;
+            padding: 15px;
+            background: #d4edda;
+            border-radius: 5px;
+        }
+        .step-indicator {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            text-align: center;
+            line-height: 20px;
+            font-size: 12px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 패션 추천 SSE 스트리밍 테스트</h1>
+        
+        <form id="fashionForm">
+            <div class="form-group">
+                <label for="userInput">패션 질문:</label>
+                <textarea id="userInput" rows="3" placeholder="예: 여름에 데이트할 때 입을 옷 추천해줘" required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="expertType">전문가 유형:</label>
+                <select id="expertType" required>
+                    <option value="STYLE_ANALYST">스타일 분석가</option>
+                    <option value="COLOR_EXPERT">컬러 전문가</option>
+                    <option value="TREND_EXPERT">트렌드 전문가</option>
+                    <option value="FITTING_COORDINATOR">코디네이터</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="roomId">방 ID:</label>
+                <input type="number" id="roomId" value="1" min="1" required>
+            </div>
+            
+            <button type="submit" id="submitBtn">🚀 패션 추천 시작</button>
+        </form>
+        
+        <div class="stream-container" id="streamContainer" style="display: none;">
+            <div id="streamContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        
+        document.getElementById('fashionForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const streamContainer = document.getElementById('streamContainer');
+            const streamContent = document.getElementById('streamContent');
+            
+            // UI 초기화
+            submitBtn.disabled = true;
+            submitBtn.textContent = '🔄 처리 중...';
+            streamContainer.style.display = 'block';
+            streamContent.innerHTML = '<div class="status-message">연결 중...</div>';
+            
+            // 기존 연결 종료
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            try {
+                // API 호출
+                const response = await fetch('/api/expert/single/stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_input: document.getElementById('userInput').value,
+                        expert_type: document.getElementById('expertType').value,
+                        room_id: parseInt(document.getElementById('roomId').value)
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                // SSE 스트림 처리
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                handleStreamData(data);
+                            } catch (parseError) {
+                                console.error('JSON 파싱 오류:', parseError);
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('스트리밍 오류:', error);
+                streamContent.innerHTML += `<div class="error-message">❌ 오류 발생: ${error.message}</div>`;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🚀 패션 추천 시작';
+            }
+        });
+        
+        function handleStreamData(data) {
+            const streamContent = document.getElementById('streamContent');
+            
+            switch (data.type) {
+                case 'status':
+                    const stepIndicator = `<span class="step-indicator">${data.step}</span>`;
+                    streamContent.innerHTML += `<div class="status-message">${stepIndicator}${data.message}</div>`;
+                    break;
+                    
+                case 'content':
+                    streamContent.innerHTML += `<div class="content-chunk">${data.chunk}</div>`;
+                    break;
+                    
+                case 'complete':
+                    streamContent.innerHTML += `<div class="complete-message">✅ 분석 완료!</div>`;
+                    // 완료된 데이터를 콘솔에 출력
+                    console.log('완료된 데이터:', data.data);
+                    break;
+                    
+                case 'error':
+                    streamContent.innerHTML += `<div class="error-message">❌ ${data.message}</div>`;
+                    break;
+            }
+            
+            // 자동 스크롤
+            streamContent.scrollTop = streamContent.scrollHeight;
+        }
+    </script>
+</body>
+</html>
