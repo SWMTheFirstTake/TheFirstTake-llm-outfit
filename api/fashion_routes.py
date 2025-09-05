@@ -1183,14 +1183,16 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                 if all_outfits:
                     all_outfits.sort(key=lambda x: x['score'], reverse=True)
                     selected_match = all_outfits[0]
-                    yield f"data: {json.dumps({'type': 'status', 'message': f'최고 점수 착장 선택: {selected_match["filename"]}', 'step': 5})}\n\n"
+                    message = f'최고 점수 착장 선택: {selected_match["filename"]}'
+                    yield f"data: {json.dumps({'type': 'status', 'message': message, 'step': 5})}\n\n"
                 else:
                     yield f"data: {json.dumps({'type': 'status', 'message': '매칭할 수 있는 착장이 없어 fallback으로 전환...', 'step': 6})}\n\n"
                     fallback_result = await fallback_expert_analysis(request)
                     yield f"data: {json.dumps({'type': 'complete', 'data': fallback_result.dict()})}\n\n"
                     return
             else:
-                yield f"data: {json.dumps({'type': 'status', 'message': f'S3 매칭 성공: {len(matching_result["matches"])}개 착장 발견', 'step': 7})}\n\n"
+                message = f'S3 매칭 성공: {len(matching_result["matches"])}개 착장 발견'
+                yield f"data: {json.dumps({'type': 'status', 'message': message, 'step': 7})}\n\n"
                 
                 # 기존 로직과 동일한 선택 로직
                 import random
@@ -1229,10 +1231,12 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                 # 최종 선택
                 if available_matches:
                     selected_match = random.choice(available_matches)
-                    yield f"data: {json.dumps({'type': 'status', 'message': f'최종 착장 선택: {selected_match["filename"]}', 'step': 9})}\n\n"
+                    message = f'최종 착장 선택: {selected_match["filename"]}'
+                    yield f"data: {json.dumps({'type': 'status', 'message': message, 'step': 9})}\n\n"
                 else:
                     selected_match = random.choice(selection_pool)
-                    yield f"data: {json.dumps({'type': 'status', 'message': f'필터링 후 후보 없음, 전체에서 선택: {selected_match["filename"]}', 'step': 10})}\n\n"
+                    message = f'필터링 후 후보 없음, 전체에서 선택: {selected_match["filename"]}'
+                    yield f"data: {json.dumps({'type': 'status', 'message': message, 'step': 10})}\n\n"
                 
                 # Redis에 최근 사용 추가
                 recent_used.append(selected_match['filename'])
