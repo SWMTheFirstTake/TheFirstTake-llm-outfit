@@ -330,7 +330,7 @@ jobs:
         
         # LLM 서비스의 헬스체크 엔드포인트
         for i in {1..30}; do
-          if curl -f -s http://thefirsttake-llm-service-oqrj3cfl:6020/llm/api/health; then
+          if curl -f -s https://the-second-take.com/llm/api/health; then
             echo "✅ Health check passed!"
             exit 0
           fi
@@ -346,4 +346,4 @@ jobs:
       run: |
         echo "🎉 Deployment successful!"
         echo "🌐 LLM Service deployed to ECS"
-        echo "🏥 Health Check: http://thefirsttake-llm-service-oqrj3cfl:6020/llm/api/health"
+        echo "🏥 Health Check: https://the-second-take.com/llm/api/health"
