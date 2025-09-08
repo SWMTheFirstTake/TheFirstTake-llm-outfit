@@ -51,7 +51,7 @@ except Exception as e:
     claude_vision_service = None
 
 # 라우터 생성
-router = APIRouter(prefix="/api", tags=["fashion"])
+router = APIRouter(prefix="/llm/api", tags=["fashion"])
 
 @router.get("/",
             summary="API 환영 메시지",
