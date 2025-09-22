@@ -1128,7 +1128,74 @@ async def analyze_outfit_upload(file: UploadFile = File(...)):
 
 @router.post("/expert/single/stream",
              summary="SSE 스트리밍 단일 전문가 매칭",
-             description="실시간 진행 상황을 SSE로 전송하며 패션 추천을 제공합니다. 14단계 진행 상황과 전문가 분석을 실시간으로 확인할 수 있습니다.",
+             description="""
+             실시간 진행 상황을 SSE로 전송하며 패션 추천을 제공합니다.
+             
+             ## 응답 형식 (Server-Sent Events)
+             
+             ### 1. Status 이벤트 (진행 상황)
+             ```
+             data: {"type": "status", "message": "착장 매칭 시작...", "step": 1}
+             data: {"type": "status", "message": "S3에서 착장 검색 중...", "step": 2}
+             data: {"type": "status", "message": "전문가 분석 시작...", "step": 11}
+             ```
+             
+             ### 2. Content 이벤트 (실시간 전문가 분석)
+             ```
+             data: {"type": "content", "chunk": "안녕하세요! "}
+             data: {"type": "content", "chunk": "패션을 "}
+             data: {"type": "content", "chunk": "추천해드리겠습니다."}
+             ```
+             
+             ### 3. Complete 이벤트 (완료)
+             ```
+             data: {"type": "complete", "data": {
+               "matched_outfit": {
+                 "filename": "outfit_123.json",
+                 "score": 0.85,
+                 "s3_url": "https://...",
+                 "situations": ["데이트", "캐주얼"]
+               },
+               "total_matches": 45,
+               "search_method": "s3_index",
+               "source": "s3_json_stream"
+             }}
+             ```
+             
+             ### 4. Error 이벤트 (오류)
+             ```
+             data: {"type": "error", "message": "스트리밍 분석 실패: ..."}
+             ```
+             
+             ## 처리 단계 (14단계)
+             1. 매칭 시작 → 2. S3 검색 → 3. 매칭 실패시 fallback → 4-10. 착장 선택 → 11. 전문가 분석 → 12. Claude API 호출 → 13-14. 완료
+             
+             ## 클라이언트 사용법
+             ```javascript
+             const response = await fetch('/llm/api/expert/single/stream', {
+               method: 'POST',
+               headers: {'Content-Type': 'application/json'},
+               body: JSON.stringify(request)
+             });
+             
+             const reader = response.body.getReader();
+             while (true) {
+               const {done, value} = await reader.read();
+               if (done) break;
+               
+               const line = new TextDecoder().decode(value);
+               if (line.startsWith('data: ')) {
+                 const data = JSON.parse(line.slice(6));
+                 switch(data.type) {
+                   case 'status': // 진행 상황 표시
+                   case 'content': // 전문가 분석 내용 표시  
+                   case 'complete': // 완료 처리
+                   case 'error': // 오류 처리
+                 }
+               }
+             }
+             ```
+             """,
              tags=["패션 추천", "스트리밍"])
 async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
     """단일 전문가 분석 - SSE 스트리밍 방식"""

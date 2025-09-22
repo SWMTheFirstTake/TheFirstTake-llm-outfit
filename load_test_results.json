@@ -1,0 +1,127 @@
+{
+  "test_config": {
+    "url": "https://the-second-take.com/api/chat/rooms/messages/stream",
+    "user_input": "소개팅을 가야 하는 상황이야",
+    "num_requests": 5
+  },
+  "sequential_test": {
+    "results": [
+      {
+        "request_id": 1,
+        "status_code": 200,
+        "response_time": 48.604647636413574,
+        "content_length": 0,
+        "success": true,
+        "error": null,
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      },
+      {
+        "request_id": 2,
+        "status_code": 200,
+        "response_time": 45.1716685295105,
+        "content_length": 0,
+        "success": true,
+        "error": null,
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      },
+      {
+        "request_id": 3,
+        "status_code": 200,
+        "response_time": 44.8301842212677,
+        "content_length": 0,
+        "success": true,
+        "error": null,
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      },
+      {
+        "request_id": 4,
+        "status_code": 200,
+        "response_time": 47.5062370300293,
+        "content_length": 0,
+        "success": true,
+        "error": null,
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      },
+      {
+        "request_id": 5,
+        "status_code": 200,
+        "response_time": 45.39826250076294,
+        "content_length": 0,
+        "success": true,
+        "error": null,
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      }
+    ],
+    "total_time": 235.54758286476135
+  },
+  "concurrent_test": {
+    "results": [
+      {
+        "request_id": 1,
+        "status_code": null,
+        "response_time": 60.13619422912598,
+        "content_length": 0,
+        "success": false,
+        "error": "",
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      },
+      {
+        "request_id": 2,
+        "status_code": null,
+        "response_time": 60.133933544158936,
+        "content_length": 0,
+        "success": false,
+        "error": "",
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      },
+      {
+        "request_id": 3,
+        "status_code": null,
+        "response_time": 60.13291549682617,
+        "content_length": 0,
+        "success": false,
+        "error": "",
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      },
+      {
+        "request_id": 4,
+        "status_code": null,
+        "response_time": 60.133070945739746,
+        "content_length": 0,
+        "success": false,
+        "error": "",
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      },
+      {
+        "request_id": 5,
+        "status_code": null,
+        "response_time": 60.13074231147766,
+        "content_length": 0,
+        "success": false,
+        "error": "",
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      }
+    ],
+    "total_time": 60.13998818397522
+  }
+}

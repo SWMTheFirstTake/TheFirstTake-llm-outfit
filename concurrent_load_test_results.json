@@ -1,0 +1,67 @@
+{
+  "test_config": {
+    "url": "https://the-second-take.com/api/chat/rooms/messages/stream",
+    "user_input": "소개팅을 가야 하는 상황이야",
+    "num_requests": 5
+  },
+  "concurrent_test": {
+    "results": [
+      {
+        "request_id": 1,
+        "status_code": null,
+        "response_time": 60.93230867385864,
+        "content_length": 0,
+        "success": false,
+        "error": "",
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      },
+      {
+        "request_id": 2,
+        "status_code": null,
+        "response_time": 60.92592239379883,
+        "content_length": 0,
+        "success": false,
+        "error": "",
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      },
+      {
+        "request_id": 3,
+        "status_code": null,
+        "response_time": 60.92249298095703,
+        "content_length": 0,
+        "success": false,
+        "error": "",
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      },
+      {
+        "request_id": 4,
+        "status_code": null,
+        "response_time": 60.92424750328064,
+        "content_length": 0,
+        "success": false,
+        "error": "",
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      },
+      {
+        "request_id": 5,
+        "status_code": null,
+        "response_time": 60.924832344055176,
+        "content_length": 0,
+        "success": false,
+        "error": "",
+        "events_received": 0,
+        "event_types": [],
+        "response_content": null
+      }
+    ],
+    "total_time": 60.93673038482666
+  }
+}

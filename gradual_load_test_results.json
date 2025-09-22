@@ -1,0 +1,276 @@
+{
+  "test_config": {
+    "url": "https://the-second-take.com/api/chat/rooms/messages/stream",
+    "user_input": "소개팅을 가야 하는 상황이야",
+    "concurrent_counts": [
+      1,
+      2,
+      3,
+      5,
+      10
+    ]
+  },
+  "results": {
+    "concurrent_1": {
+      "results": [
+        {
+          "request_id": 1,
+          "status_code": 200,
+          "response_time": 48.63714027404785,
+          "content_length": 0,
+          "success": true,
+          "error": null,
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        }
+      ],
+      "total_time": 48.6422963142395,
+      "success_rate": 100.0
+    },
+    "concurrent_2": {
+      "results": [
+        {
+          "request_id": 1,
+          "status_code": 200,
+          "response_time": 49.67546558380127,
+          "content_length": 0,
+          "success": true,
+          "error": null,
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 2,
+          "status_code": 200,
+          "response_time": 50.064183712005615,
+          "content_length": 0,
+          "success": true,
+          "error": null,
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        }
+      ],
+      "total_time": 50.067561864852905,
+      "success_rate": 100.0
+    },
+    "concurrent_3": {
+      "results": [
+        {
+          "request_id": 1,
+          "status_code": 200,
+          "response_time": 55.78990864753723,
+          "content_length": 0,
+          "success": true,
+          "error": null,
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 2,
+          "status_code": 200,
+          "response_time": 55.90240430831909,
+          "content_length": 0,
+          "success": true,
+          "error": null,
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 3,
+          "status_code": 200,
+          "response_time": 57.840020418167114,
+          "content_length": 0,
+          "success": true,
+          "error": null,
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        }
+      ],
+      "total_time": 57.84600782394409,
+      "success_rate": 100.0
+    },
+    "concurrent_5": {
+      "results": [
+        {
+          "request_id": 1,
+          "status_code": null,
+          "response_time": 60.67344522476196,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 2,
+          "status_code": null,
+          "response_time": 60.674253940582275,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 3,
+          "status_code": null,
+          "response_time": 60.67275047302246,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 4,
+          "status_code": null,
+          "response_time": 60.67305326461792,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 5,
+          "status_code": null,
+          "response_time": 60.67340540885925,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        }
+      ],
+      "total_time": 60.676846981048584,
+      "success_rate": 0.0
+    },
+    "concurrent_10": {
+      "results": [
+        {
+          "request_id": 1,
+          "status_code": null,
+          "response_time": 60.98391842842102,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 2,
+          "status_code": null,
+          "response_time": 60.98153567314148,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 3,
+          "status_code": null,
+          "response_time": 60.9797625541687,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 4,
+          "status_code": null,
+          "response_time": 60.980886936187744,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 5,
+          "status_code": null,
+          "response_time": 60.98170065879822,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 6,
+          "status_code": null,
+          "response_time": 60.98000454902649,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 7,
+          "status_code": null,
+          "response_time": 60.98122239112854,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 8,
+          "status_code": null,
+          "response_time": 60.98236608505249,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 9,
+          "status_code": null,
+          "response_time": 60.98193311691284,
+          "content_length": 0,
+          "success": false,
+          "error": "",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        },
+        {
+          "request_id": 10,
+          "status_code": null,
+          "response_time": 60.159539222717285,
+          "content_length": 0,
+          "success": false,
+          "error": "Response payload is not completed: <TransferEncodingError: 400, message='Not enough data to satisfy transfer length header.'>",
+          "events_received": 0,
+          "event_types": [],
+          "response_content": null
+        }
+      ],
+      "total_time": 60.98490309715271,
+      "success_rate": 0.0
+    }
+  }
+}
