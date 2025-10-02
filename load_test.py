@@ -5,11 +5,11 @@ import json
 from typing import List, Dict, Any
 
 class LoadTester:
-    def __init__(self, base_url: str = "https://the-second-take.com"):
+    def __init__(self, base_url: str = "https://the-first-take.com"):
         self.base_url = base_url
         self.endpoint = "/api/chat/rooms/messages/stream"
         self.user_input = "소개팅을 가야 하는 상황이야"
-        self.num_requests = 5
+        self.num_requests = 40
         
     async def single_request(self, session: aiohttp.ClientSession, request_id: int) -> Dict[str, Any]:
         """단일 요청을 보내고 결과를 반환합니다."""
@@ -89,6 +89,32 @@ class LoadTester:
                 "response_content": None
             }
     
+    async def single_request_with_new_session(self, request_id: int) -> Dict[str, Any]:
+        """새로운 세션으로 단일 요청을 보내고 결과를 반환합니다."""
+        # 매번 새로운 세션과 커넥터 생성
+        timeout = aiohttp.ClientTimeout(total=1200)
+        connector = aiohttp.TCPConnector(
+            limit=10,  # 각 세션당 연결 수 제한
+            limit_per_host=5,  # 호스트당 연결 수 제한
+            ttl_dns_cache=300,
+            use_dns_cache=True,
+        )
+        
+        # 헤더 설정
+        headers = {
+            'User-Agent': 'LoadTester/1.0',
+            'Accept': 'text/event-stream',
+            'Cache-Control': 'no-cache'
+        }
+        
+        async with aiohttp.ClientSession(
+            timeout=timeout, 
+            connector=connector,
+            headers=headers,
+            cookie_jar=aiohttp.DummyCookieJar()  # 쿠키 저장 안함
+        ) as session:
+            return await self.single_request(session, request_id)
+
     async def run_load_test(self, concurrent: bool = False) -> List[Dict[str, Any]]:
         """부하테스트를 실행합니다."""
         mode = "동시" if concurrent else "순차"
@@ -96,24 +122,19 @@ class LoadTester:
         print(f"사용자 입력: '{self.user_input}'")
         print("-" * 50)
         
-        # 세션 설정 - SSE용으로 타임아웃 증가
-        timeout = aiohttp.ClientTimeout(total=60)  # 60초 타임아웃 (SSE는 시간이 더 걸림)
-        connector = aiohttp.TCPConnector(limit=100)  # 동시 연결 수 제한
-        
-        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
-            if concurrent:
-                # 모든 요청을 동시에 시작
-                tasks = [self.single_request(session, i+1) for i in range(self.num_requests)]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-            else:
-                # 순차적으로 실행 (각 요청 사이에 1초 지연)
-                results = []
-                for i in range(self.num_requests):
-                    print(f"요청 #{i+1} 시작...")
-                    result = await self.single_request(session, i+1)
-                    results.append(result)
-                    if i < self.num_requests - 1:  # 마지막 요청이 아니면 지연
-                        await asyncio.sleep(1)
+        if concurrent:
+            # 모든 요청을 동시에 시작 (각각 새로운 세션 사용)
+            tasks = [self.single_request_with_new_session(i+1) for i in range(self.num_requests)]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+        else:
+            # 순차적으로 실행 (각 요청 사이에 1초 지연)
+            results = []
+            for i in range(self.num_requests):
+                print(f"요청 #{i+1} 시작...")
+                result = await self.single_request_with_new_session(i+1)
+                results.append(result)
+                if i < self.num_requests - 1:  # 마지막 요청이 아니면 지연
+                    await asyncio.sleep(1)
         
         # 예외 처리
         processed_results = []
@@ -137,29 +158,59 @@ class LoadTester:
         successful_requests = [r for r in results if r["success"]]
         failed_requests = [r for r in results if not r["success"]]
         
+        # 성공률 계산
+        success_rate = (len(successful_requests) / self.num_requests) * 100
+        
+        print(f"\n📊 전체 결과 요약:")
+        print(f"  총 요청 수: {self.num_requests}개")
+        print(f"  성공: {len(successful_requests)}개 ({success_rate:.1f}%)")
+        print(f"  실패: {len(failed_requests)}개 ({100-success_rate:.1f}%)")
+        
         if successful_requests:
             response_times = [r["response_time"] for r in successful_requests]
             avg_response_time = sum(response_times) / len(response_times)
             min_response_time = min(response_times)
             max_response_time = max(response_times)
             
-            print(f"\n📊 성공한 요청: {len(successful_requests)}/{self.num_requests}")
-            print(f"⏱️  평균 응답 시간: {avg_response_time:.3f}초")
-            print(f"⚡ 최소 응답 시간: {min_response_time:.3f}초")
-            print(f"🐌 최대 응답 시간: {max_response_time:.3f}초")
+            print(f"\n✅ 성공한 요청 상세:")
+            print(f"  ⏱️  평균 응답 시간: {avg_response_time:.3f}초")
+            print(f"  ⚡ 최소 응답 시간: {min_response_time:.3f}초")
+            print(f"  🐌 최대 응답 시간: {max_response_time:.3f}초")
         
         if failed_requests:
-            print(f"\n❌ 실패한 요청: {len(failed_requests)}/{self.num_requests}")
-            for failed in failed_requests[:5]:  # 처음 5개만 자세히 표시
+            print(f"\n❌ 실패한 요청 분석:")
+            
+            # 에러 타입별 분류
+            error_types = {}
+            for failed in failed_requests:
+                error_msg = failed.get('error', 'Unknown error')
+                if 'TransferEncodingError' in error_msg:
+                    error_types['TransferEncodingError'] = error_types.get('TransferEncodingError', 0) + 1
+                elif 'timeout' in error_msg.lower():
+                    error_types['Timeout'] = error_types.get('Timeout', 0) + 1
+                elif 'connection' in error_msg.lower():
+                    error_types['Connection Error'] = error_types.get('Connection Error', 0) + 1
+                else:
+                    error_types['Other'] = error_types.get('Other', 0) + 1
+            
+            print(f"  에러 타입별 분포:")
+            for error_type, count in error_types.items():
+                print(f"    - {error_type}: {count}개")
+            
+            # 실패 시간 분석
+            failed_times = [r["response_time"] for r in failed_requests if r["response_time"] > 0]
+            if failed_times:
+                avg_failed_time = sum(failed_times) / len(failed_times)
+                print(f"  평균 실패 시간: {avg_failed_time:.3f}초")
+            
+            print(f"\n  상세 실패 내역 (처음 5개):")
+            for failed in failed_requests[:5]:
                 error_msg = failed.get('error', 'Unknown error')
                 status_code = failed.get('status_code', 'N/A')
-                response_content = failed.get('response_content', '')
                 
-                print(f"  - 요청 #{failed['request_id']}: 상태코드 {status_code}")
-                if error_msg:
-                    print(f"    에러: {error_msg}")
-                if response_content:
-                    print(f"    응답 내용: {response_content[:200]}...")
+                print(f"    - 요청 #{failed['request_id']}: 상태코드 {status_code}")
+                print(f"      에러: {error_msg}")
+                print(f"      실패 시간: {failed['response_time']:.3f}초")
                 print()
         
         # 상태 코드별 통계
