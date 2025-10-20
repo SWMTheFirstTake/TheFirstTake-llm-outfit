@@ -2257,7 +2257,12 @@ class SimpleFashionExpertService:
 분석된 옷 조합 정보:
 {json.dumps(json_data, ensure_ascii=False, indent=2)}
 
-위 정보를 바탕으로 전문가 답변을 생성해주세요."""
+중요: 위 JSON 데이터의 실제 색상 조합만을 정확히 설명해주세요. 
+- 상의 색상: {json_data.get('top', {}).get('color', 'N/A')}
+- 하의 색상: {json_data.get('bottom', {}).get('color', 'N/A')}
+- 신발 색상: {json_data.get('shoes', {}).get('color', 'N/A')}
+
+위 정보를 바탕으로 실제 색상 조합만을 정확히 설명하는 전문가 답변을 생성해주세요."""
 
             # Claude API 스트리밍 호출
             async for chunk in self._call_claude_stream(system_prompt, user_prompt):
