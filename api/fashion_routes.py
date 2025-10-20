@@ -1252,17 +1252,25 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                     # 사용자 요청 색상과 정확히 일치하는 아웃핏만 선택
                     final_filenames = []
                     
-                    # 각 색상별로 정확히 일치하는 파일들 수집
+                    # 각 색상별로 포함된 키들을 찾아서 파일들 수집
                     for c in color_candidates:
-                        color_key = f"fashion_index:color:{c.lower()}"
-                        color_files = set(redis_service.smembers(color_key))
+                        # 색상이 포함된 모든 키 찾기
+                        color_pattern = f"fashion_index:color:*{c.lower()}*"
+                        color_keys = redis_service.keys(color_pattern)
+                        color_files = set()
+                        for key in color_keys:
+                            color_files.update(redis_service.smembers(key))
                         
-                        # 각 아이템별로 정확히 일치하는 파일들 수집
+                        # 각 아이템별로 포함된 키들을 찾아서 파일들 수집
                         for i in item_candidates:
-                            item_key = f"fashion_index:item:{i.lower()}"
-                            item_files = set(redis_service.smembers(item_key))
+                            # 아이템이 포함된 모든 키 찾기
+                            item_pattern = f"fashion_index:item:*{i.lower()}*"
+                            item_keys = redis_service.keys(item_pattern)
+                            item_files = set()
+                            for key in item_keys:
+                                item_files.update(redis_service.smembers(key))
                             
-                            # 색상과 아이템이 모두 정확히 일치하는 파일들
+                            # 색상과 아이템이 모두 포함된 파일들
                             exact_matches = color_files.intersection(item_files)
                             final_filenames.extend(list(exact_matches))
                     
