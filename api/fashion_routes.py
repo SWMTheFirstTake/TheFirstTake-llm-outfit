@@ -1249,22 +1249,25 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                 if color_candidates and item_candidates:
                     yield f"data: {json.dumps({'type': 'status', 'message': '색상+아이템 교집합으로 후보 검색...', 'step': 2})}\n\n"
 
-                    # 색상 교집합
-                    color_sets = []
+                    # 사용자 요청 색상과 정확히 일치하는 아웃핏만 선택
+                    final_filenames = []
+                    
+                    # 각 색상별로 정확히 일치하는 파일들 수집
                     for c in color_candidates:
-                        key = f"fashion_index:color:{c.lower()}"
-                        color_sets.append(set(redis_service.smembers(key)))
-                    color_intersection = set.intersection(*color_sets) if color_sets else set()
-
-                    # 아이템 교집합
-                    item_sets = []
-                    for i in item_candidates:
-                        key = f"fashion_index:item:{i.lower()}"
-                        item_sets.append(set(redis_service.smembers(key)))
-                    item_intersection = set.intersection(*item_sets) if item_sets else set()
-
-                    # 최종 교집합
-                    final_filenames = list(color_intersection.intersection(item_intersection))
+                        color_key = f"fashion_index:color:{c.lower()}"
+                        color_files = set(redis_service.smembers(color_key))
+                        
+                        # 각 아이템별로 정확히 일치하는 파일들 수집
+                        for i in item_candidates:
+                            item_key = f"fashion_index:item:{i.lower()}"
+                            item_files = set(redis_service.smembers(item_key))
+                            
+                            # 색상과 아이템이 모두 정확히 일치하는 파일들
+                            exact_matches = color_files.intersection(item_files)
+                            final_filenames.extend(list(exact_matches))
+                    
+                    # 중복 제거
+                    final_filenames = list(set(final_filenames))
 
                     if final_filenames:
                         yield f"data: {json.dumps({'type': 'status', 'message': f'교집합 후보 {len(final_filenames)}개 발견', 'step': 7})}\n\n"
