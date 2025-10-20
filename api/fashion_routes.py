@@ -1201,6 +1201,7 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
     """단일 전문가 분석 - SSE 스트리밍 방식"""
     from fastapi.responses import StreamingResponse
     import json
+    import random
     
     # 디버깅: 요청 데이터 로깅
     print(f"🔍 SSE 스트리밍 요청 받음:")
@@ -1214,12 +1215,98 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
             # 1단계: 매칭 시작 알림
             yield f"data: {json.dumps({'type': 'status', 'message': '착장 매칭 시작...', 'step': 1})}\n\n"
             
-            # S3에서 매칭되는 착장 찾기
-            yield f"data: {json.dumps({'type': 'status', 'message': 'S3에서 착장 검색 중...', 'step': 2})}\n\n"
-            
-            matching_result = outfit_matcher_service.find_matching_outfits_from_s3(
-                request.user_input, request.expert_type.value, request.room_id
-            )
+            # 우선: 사용자 입력에서 색상+아이템 동시 포함 시 인덱스 교집합으로 후보 선정 시도
+            selected_match = None
+            matching_result = None
+            try:
+                user_input_lower = (request.user_input or "").lower()
+                color_keywords = [
+                    "블랙", "화이트", "그레이", "브라운", "네이비", "베이지",
+                    "검정", "흰색", "회색", "갈색", "남색"
+                ]
+                # 상의/하의 중심 아이템 키워드
+                item_keywords = [
+                    # 상의
+                    "티셔츠", "반팔티", "긴팔티", "셔츠", "폴로셔츠", "니트", "스웨터",
+                    "맨투맨", "후드티", "카디건", "가디건", "베스트", "조끼",
+                    "블라우스", "헨리넥", "터틀넥", "목폴라", "블레이저", "자켓", "재킷",
+                    
+                    # 하의
+                    "슬랙스", "치노팬츠", "청바지", "데님", "데님팬츠", "팬츠", "바지",
+                    "와이드팬츠", "스트레이트팬츠", "테이퍼드팬츠", "스키니진",
+                    "카고팬츠", "조거팬츠", "스웨트팬츠",
+                    "반바지", "쇼츠", "숏팬츠", "하프팬츠",
+                    "스커트"
+                ]
+
+                color_candidates = [c for c in color_keywords if c.lower() in user_input_lower]
+                item_candidates = [i for i in item_keywords if i.lower() in user_input_lower]
+
+                if color_candidates and item_candidates:
+                    yield f"data: {json.dumps({'type': 'status', 'message': '색상+아이템 교집합으로 후보 검색...', 'step': 2})}\n\n"
+
+                    # 색상 교집합
+                    color_sets = []
+                    for c in color_candidates:
+                        key = f"fashion_index:color:{c.lower()}"
+                        color_sets.append(set(redis_service.smembers(key)))
+                    color_intersection = set.intersection(*color_sets) if color_sets else set()
+
+                    # 아이템 교집합
+                    item_sets = []
+                    for i in item_candidates:
+                        key = f"fashion_index:item:{i.lower()}"
+                        item_sets.append(set(redis_service.smembers(key)))
+                    item_intersection = set.intersection(*item_sets) if item_sets else set()
+
+                    # 최종 교집합
+                    final_filenames = list(color_intersection.intersection(item_intersection))
+
+                    if final_filenames:
+                        yield f"data: {json.dumps({'type': 'status', 'message': f'교집합 후보 {len(final_filenames)}개 발견', 'step': 7})}\n\n"
+
+                        recent_used = redis_service.get_recent_used_outfits(request.room_id, limit=20) or []
+                        available = [fn for fn in final_filenames if fn not in recent_used]
+                        candidate_pick = random.choice(available if available else final_filenames)
+
+                        json_content = s3_service.get_json_content(candidate_pick)
+                        score = (
+                            outfit_matcher_service.score_calculator.calculate_match_score(
+                                request.user_input, json_content, request.expert_type.value
+                            ) if json_content else 0.0
+                        )
+                        meta = redis_service.get_json(f"fashion_metadata:{candidate_pick}") or {}
+
+                        selected_match = {
+                            'filename': candidate_pick,
+                            'content': json_content or {},
+                            'score': score,
+                            's3_url': meta.get('s3_url', '')
+                        }
+
+                        # 최근 사용 업데이트
+                        recent_used.append(candidate_pick)
+                        if len(recent_used) > 20:
+                            recent_used.pop(0)
+                        redis_service.set_recent_used_outfits(request.room_id, recent_used)
+
+                        matching_result = {
+                            'matching_count': len(final_filenames),
+                            'search_method': 'color_item_index'
+                        }
+                    else:
+                        yield f"data: {json.dumps({'type': 'status', 'message': '교집합 결과 없음 → S3 인덱스 검색으로 전환', 'step': 2})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'status', 'message': f'교집합 검색 오류 → 기존 로직으로 전환 ({str(e)})', 'step': 2})}\n\n"
+
+            # 색상+아이템 교집합으로 선택이 없었던 경우 기존 S3 인덱스 경로 수행
+            if selected_match is None:
+                # S3에서 매칭되는 착장 찾기
+                yield f"data: {json.dumps({'type': 'status', 'message': 'S3에서 착장 검색 중...', 'step': 2})}\n\n"
+
+                matching_result = outfit_matcher_service.find_matching_outfits_from_s3(
+                    request.user_input, request.expert_type.value, request.room_id
+                )
             
             if not matching_result:
                 yield f"data: {json.dumps({'type': 'status', 'message': 'S3 매칭 실패, 기존 방식으로 전환...', 'step': 3})}\n\n"
@@ -1228,7 +1315,7 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                 yield f"data: {json.dumps({'type': 'complete', 'data': fallback_result.dict()})}\n\n"
                 return
             
-            if not matching_result['matches']:
+            if selected_match is None and not matching_result['matches']:
                 yield f"data: {json.dumps({'type': 'status', 'message': '매칭 점수가 낮아 최고 점수 착장 선택...', 'step': 4})}\n\n"
                 # 기존 로직과 동일한 fallback 처리
                 all_outfits = []
@@ -1257,12 +1344,11 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                     fallback_result = await fallback_expert_analysis(request)
                     yield f"data: {json.dumps({'type': 'complete', 'data': fallback_result.dict()})}\n\n"
                     return
-            else:
+            elif selected_match is None:
                 message = f'S3 매칭 성공: {len(matching_result["matches"])}개 착장 발견'
                 yield f"data: {json.dumps({'type': 'status', 'message': message, 'step': 7})}\n\n"
                 
                 # 기존 로직과 동일한 선택 로직
-                import random
                 top_matches = matching_result['matches']
                 selection_pool = top_matches[:min(20, len(top_matches))]
                 
