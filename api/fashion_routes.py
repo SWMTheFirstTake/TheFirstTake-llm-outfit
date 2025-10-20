@@ -1241,6 +1241,10 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
 
                 color_candidates = [c for c in color_keywords if c.lower() in user_input_lower]
                 item_candidates = [i for i in item_keywords if i.lower() in user_input_lower]
+                
+                # "셔츠" 입력 시 "티셔츠" 제외하는 로직
+                if "셔츠" in item_candidates and "티셔츠" in item_candidates:
+                    item_candidates.remove("티셔츠")
 
                 if color_candidates and item_candidates:
                     yield f"data: {json.dumps({'type': 'status', 'message': '색상+아이템 교집합으로 후보 검색...', 'step': 2})}\n\n"
