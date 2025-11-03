@@ -1,184 +1,8 @@
-name: Deploy to EC2 (Simple)
-
-on:
-  push:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Run tests
-      run: |
-        echo "테스트 실행 중..."
-        # python -m pytest
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Deploy to EC2
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.LLM_OUTFIT_EC2_HOST }}
-        username: ${{ secrets.LLM_OUTFIT_EC2_USERNAME }}
-        key: ${{ secrets.LLM_OUTFIT_EC2_SSH_KEY }}
-        script: |
-          echo "🚀 TheFirstTake LLM Outfit API 배포를 시작합니다..."
-          
-          # 프로젝트 디렉토리 확인 및 설정
-          PROJECT_DIR="/home/ubuntu/TheFirstTake-llm-outfit"
-          
-          if [ ! -d "$PROJECT_DIR" ]; then
-            echo "📁 프로젝트 디렉토리를 생성하고 리포지토리를 clone합니다..."
-            git clone https://github.com/SWMTheFirstTake/TheFirstTake-llm-outfit.git
-            cd $PROJECT_DIR
-          else
-            echo "📁 기존 프로젝트 디렉토리를 사용합니다..."
-            cd $PROJECT_DIR
-            
-            # git pull 전에 충돌하는 untracked 파일들 정리
-            echo "🧹 충돌하는 파일들을 정리합니다..."
-            git clean -fd
-            git reset --hard HEAD
-            
-            git pull origin main
-          fi
-          
-          # Python 가상환경 확인 및 생성
-          if [ ! -d "venv" ]; then
-            echo "📦 Python 가상환경을 생성합니다..."
-            python3 -m venv venv
-          fi
-          
-          # 가상환경 활성화 및 의존성 설치
-          source venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          
-          # 환경변수 설정 (.env 파일 생성)
-          echo "🔐 환경변수를 설정합니다..."
-          cat > .env <<EOF
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
-          REDIS_HOST=${{ secrets.REDIS_HOST }}
-          REDIS_PORT=${{ secrets.REDIS_PORT }}
-          AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
-          AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
-          AWS_REGION=${{ secrets.AWS_REGION }}
-          S3_COMBINATION_BUCKET_NAME=${{ secrets.S3_COMBINATION_BUCKET_NAME }}
-          S3_COMBINATION_BUCKET_IMAGE_PREFIX=${{ secrets.S3_COMBINATION_BUCKET_IMAGE_PREFIX }}
-          S3_COMBINATION_BUCKET_JSON_PREFIX=${{ secrets.S3_COMBINATION_BUCKET_JSON_PREFIX }}
-          ENVIRONMENT=production
-          DEBUG=False
-          LLM_API_HOST=0.0.0.0
-          LLM_API_PORT=6020
-          LOG_LEVEL=INFO
-          EOF
-          
-          # .env 파일 권한 설정 (보안상 중요)
-          chmod 600 .env
-
-          echo "🔄 기존 서비스를 중지합니다..."
-          # 포트 기반 정리 (안전함)
-          echo "포트 6020 정리 중..."
-          lsof -ti:6020 | xargs -r kill -TERM 2>/dev/null || true
-          sleep 3
-
-          # systemctl도 이제 안전하게 사용 가능
-          if sudo systemctl is-active --quiet llm-outfit-api; then
-              sudo systemctl stop llm-outfit-api
-              sleep 3
-          fi
-          # echo "1단계: 현재 프로세스 목록 확인"
-          # ps aux | grep uvicorn | head -5
-
-          # echo "2단계: 포트 사용 상황 확인"
-          # netstat -tlnp | grep 6020 || echo "포트 6020 사용 안함"
-
-          # echo "3단계: lsof로 정리"
-          # lsof -ti:6020 | head -5 || echo "lsof 결과 없음"
-
-          # echo "4단계: 실제 정리 실행"
-          # lsof -ti:6020 | xargs -r kill -TERM 2>/dev/null || echo "kill 명령어 완료"
-
-          # echo "✅ 모든 단계 완료"
-          
-          # 서비스 파일 생성
-          echo "⚙️ 서비스 파일을 생성합니다..."
-          sudo tee /etc/systemd/system/llm-outfit-api.service > /dev/null <<EOF
-          [Unit]
-          Description=TheFirstTake LLM Outfit API
-          After=network.target
-          
-          [Service]
-          Type=simple
-          User=ubuntu
-          WorkingDirectory=$PROJECT_DIR
-          Environment=PATH=$PROJECT_DIR/venv/bin
-          Environment=ENVIRONMENT=production
-          Environment=DEBUG=False
-          Environment=LLM_API_HOST=0.0.0.0
-          Environment=LLM_API_PORT=6020
-          Environment=REDIS_HOST=${{ secrets.REDIS_HOST }}
-          Environment=REDIS_PORT=${{ secrets.REDIS_PORT }}
-          Environment=AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
-          Environment=AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
-          Environment=AWS_REGION=${{ secrets.AWS_REGION }}
-          Environment=S3_COMBINATION_BUCKET_NAME=${{ secrets.S3_COMBINATION_BUCKET_NAME }}
-          Environment=S3_COMBINATION_BUCKET_IMAGE_PREFIX=${{ secrets.S3_COMBINATION_BUCKET_IMAGE_PREFIX }}
-          Environment=S3_COMBINATION_BUCKET_JSON_PREFIX=${{ secrets.S3_COMBINATION_BUCKET_JSON_PREFIX }}
-          Environment=LOG_LEVEL=INFO
-          ExecStart=$PROJECT_DIR/venv/bin/uvicorn main:app --host 0.0.0.0 --port 6020
-          Restart=always
-          RestartSec=10
-          
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-          
-          # 서비스 등록 및 시작
-          echo "🚀 서비스를 시작합니다..."
-          sudo systemctl daemon-reload
-          sudo systemctl enable llm-outfit-api
-          sudo systemctl start llm-outfit-api
-          
-          # 배포 확인
-          echo "✅ 배포가 완료되었습니다!"
-          echo "📍 서버 주소: http://${{ secrets.LLM_OUTFIT_EC2_HOST }}:6020"
-          
-          # 서비스 상태 확인
-          sudo systemctl status llm-outfit-api --no-pager
-
-# name: Deploy to ECS
+# name: Deploy to EC2 (Simple)
 
 # on:
 #   push:
 #     branches: [ main ]
-#   pull_request:
-#     branches: [ main ]
-
-# env:
-#   AWS_REGION: ${{ secrets.AWS_REGION }}
-#   ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-#   ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
 
 # jobs:
 #   test:
@@ -202,148 +26,324 @@ jobs:
 #         echo "테스트 실행 중..."
 #         # python -m pytest
 
-#   deploy-llm:
+#   deploy:
 #     needs: test
 #     runs-on: ubuntu-latest
 #     if: github.ref == 'refs/heads/main'
     
 #     steps:
-#     - name: Checkout code
-#       uses: actions/checkout@v4
-
-#     - name: Configure AWS credentials
-#       uses: aws-actions/configure-aws-credentials@v4
+#     - uses: actions/checkout@v4
+    
+#     - name: Deploy to EC2
+#       uses: appleboy/ssh-action@v1.0.0
 #       with:
-#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#         aws-region: ${{ env.AWS_REGION }}
-
-#     - name: Login to Amazon ECR
-#       id: login-ecr
-#       uses: aws-actions/amazon-ecr-login@v2
-
-#     - name: Build, tag, and push LLM image
-#       id: build-llm
-#       env:
-#         ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_LLM }}
-#         IMAGE_TAG: ${{ github.sha }}
-#       run: |
-#         echo "🔨 Building Docker image..."
-#         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        
-#         echo "📤 Pushing image to ECR..."
-#         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        
-#         echo "✅ Image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-#         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-
-#     - name: Download current task definition
-#       run: |
-#         echo "📋 Downloading current task definition..."
-#         aws ecs describe-task-definition \
-#           --task-definition thefirsttake-llm \
-#           --query 'taskDefinition' > task-definition.json
-
-#     - name: Update task definition with new image and environment variables
-#       id: task-def
-#       run: |
-#         echo "🔄 Updating task definition..."
-        
-#         # 새로운 이미지로 업데이트하고 환경변수 설정
-#         jq --arg IMAGE "${{ steps.build-llm.outputs.image }}" \
-#            --arg OPENAI_API_KEY "${{ secrets.OPENAI_API_KEY }}" \
-#            --arg CLAUDE_API_KEY "${{ secrets.CLAUDE_API_KEY }}" \
-#            --arg REDIS_HOST "${{ secrets.REDIS_HOST }}" \
-#            --arg REDIS_PORT "${{ secrets.REDIS_PORT }}" \
-#            --arg AWS_ACCESS_KEY "${{ secrets.AWS_ACCESS_KEY }}" \
-#            --arg AWS_SECRET_KEY "${{ secrets.AWS_SECRET_KEY }}" \
-#            --arg AWS_REGION "${{ secrets.AWS_REGION }}" \
-#            --arg S3_COMBINATION_BUCKET_NAME "${{ secrets.S3_COMBINATION_BUCKET_NAME }}" \
-#            --arg S3_COMBINATION_BUCKET_IMAGE_PREFIX "${{ secrets.S3_COMBINATION_BUCKET_IMAGE_PREFIX }}" \
-#            --arg S3_COMBINATION_BUCKET_JSON_PREFIX "${{ secrets.S3_COMBINATION_BUCKET_JSON_PREFIX }}" \
-#            '
-#            .containerDefinitions[0].image = $IMAGE |
-#            .containerDefinitions[0].environment = [
-#              {"name": "OPENAI_API_KEY", "value": $OPENAI_API_KEY},
-#              {"name": "CLAUDE_API_KEY", "value": $CLAUDE_API_KEY},
-#              {"name": "REDIS_HOST", "value": $REDIS_HOST},
-#              {"name": "REDIS_PORT", "value": $REDIS_PORT},
-#              {"name": "AWS_ACCESS_KEY", "value": $AWS_ACCESS_KEY},
-#              {"name": "AWS_SECRET_KEY", "value": $AWS_SECRET_KEY},
-#              {"name": "AWS_REGION", "value": $AWS_REGION},
-#              {"name": "S3_COMBINATION_BUCKET_NAME", "value": $S3_COMBINATION_BUCKET_NAME},
-#              {"name": "S3_COMBINATION_BUCKET_IMAGE_PREFIX", "value": $S3_COMBINATION_BUCKET_IMAGE_PREFIX},
-#              {"name": "S3_COMBINATION_BUCKET_JSON_PREFIX", "value": $S3_COMBINATION_BUCKET_JSON_PREFIX},
-#              {"name": "ENVIRONMENT", "value": "production"},
-#              {"name": "DEBUG", "value": "False"},
-#              {"name": "LLM_API_HOST", "value": "0.0.0.0"},
-#              {"name": "LLM_API_PORT", "value": "6020"},
-#              {"name": "LOG_LEVEL", "value": "INFO"}
-#            ] |
-#            del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
-#            ' task-definition.json > new-task-definition.json
-
-#     - name: Register new task definition
-#       id: register-task-def
-#       run: |
-#         echo "📝 Registering new task definition..."
-#         NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
-#           --cli-input-json file://new-task-definition.json \
-#           --query 'taskDefinition.taskDefinitionArn' \
-#           --output text)
-        
-#         echo "✅ New task definition: $NEW_TASK_DEF_ARN"
-#         echo "task-def-arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
-
-#     - name: Debug ECS Variables
-#       run: |
-#         echo "🔍 Debugging ECS configuration..."
-#         echo "ECS_CLUSTER: ${{ env.ECS_CLUSTER }}"
-#         echo "ECS_SERVICE_LLM: 'thefirsttake-llm-service-oqrj3cfl'"
-#         echo "Length of service name: ${ECS_SERVICE_LLM}"
-    
-#     - name: Update ECS LLM Service
-#       run: |
-#         echo "🚀 Updating ECS service..."
-#         SERVICE_NAME="thefirsttake-llm-service-oqrj3cfl"
-#         TASK_DEFINITION="${{ steps.register-task-def.outputs.task-def-arn }}"
-#         CLUSTER_NAME="the-first-take-cluster"
-#         aws ecs update-service --cluster "${CLUSTER_NAME}" --service "${SERVICE_NAME}" --task-definition "${TASK_DEFINITION}" --force-new-deployment
-
-#     - name: Wait for service stability
-#       run: |
-#         echo "⏳ Waiting for service to stabilize..."
-#         CLUSTER_NAME="the-first-take-cluster"
-#         SERVICE_NAME="thefirsttake-llm-service-oqrj3cfl"
-#         aws ecs wait services-stable --cluster "${CLUSTER_NAME}" --services "${SERVICE_NAME}"
-#         echo "✅ Service deployment completed!"
-
-#   health-check:
-#     needs: deploy-llm
-#     runs-on: ubuntu-latest
-#     if: github.ref == 'refs/heads/main'
-    
-#     steps:
-#     - name: Health Check
-#       run: |
-#         echo "🔍 Performing health check..."
-        
-#         # LLM 서비스의 헬스체크 엔드포인트
-#         for i in {1..30}; do
-#           if curl -f -s https://the-second-take.com/llm/api/health; then
-#             echo "✅ Health check passed!"
-#             exit 0
+#         host: ${{ secrets.LLM_OUTFIT_EC2_HOST }}
+#         username: ${{ secrets.LLM_OUTFIT_EC2_USERNAME }}
+#         key: ${{ secrets.LLM_OUTFIT_EC2_SSH_KEY }}
+#         script: |
+#           echo "🚀 TheFirstTake LLM Outfit API 배포를 시작합니다..."
+          
+#           # 프로젝트 디렉토리 확인 및 설정
+#           PROJECT_DIR="/home/ubuntu/TheFirstTake-llm-outfit"
+          
+#           if [ ! -d "$PROJECT_DIR" ]; then
+#             echo "📁 프로젝트 디렉토리를 생성하고 리포지토리를 clone합니다..."
+#             git clone https://github.com/SWMTheFirstTake/TheFirstTake-llm-outfit.git
+#             cd $PROJECT_DIR
+#           else
+#             echo "📁 기존 프로젝트 디렉토리를 사용합니다..."
+#             cd $PROJECT_DIR
+            
+#             # git pull 전에 충돌하는 untracked 파일들 정리
+#             echo "🧹 충돌하는 파일들을 정리합니다..."
+#             git clean -fd
+#             git reset --hard HEAD
+            
+#             git pull origin main
 #           fi
-#           echo "Waiting for service to be healthy... ($i/30)"
-#           sleep 10
-#         done
-        
-#         echo "❌ Health check failed after 5 minutes!"
-#         exit 1
+          
+#           # Python 가상환경 확인 및 생성
+#           if [ ! -d "venv" ]; then
+#             echo "📦 Python 가상환경을 생성합니다..."
+#             python3 -m venv venv
+#           fi
+          
+#           # 가상환경 활성화 및 의존성 설치
+#           source venv/bin/activate
+#           pip install --upgrade pip
+#           pip install -r requirements.txt
+          
+#           # 환경변수 설정 (.env 파일 생성)
+#           echo "🔐 환경변수를 설정합니다..."
+#           cat > .env <<EOF
+#           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+#           CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
+#           REDIS_HOST=${{ secrets.REDIS_HOST }}
+#           REDIS_PORT=${{ secrets.REDIS_PORT }}
+#           AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
+#           AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
+#           AWS_REGION=${{ secrets.AWS_REGION }}
+#           S3_COMBINATION_BUCKET_NAME=${{ secrets.S3_COMBINATION_BUCKET_NAME }}
+#           S3_COMBINATION_BUCKET_IMAGE_PREFIX=${{ secrets.S3_COMBINATION_BUCKET_IMAGE_PREFIX }}
+#           S3_COMBINATION_BUCKET_JSON_PREFIX=${{ secrets.S3_COMBINATION_BUCKET_JSON_PREFIX }}
+#           ENVIRONMENT=production
+#           DEBUG=False
+#           LLM_API_HOST=0.0.0.0
+#           LLM_API_PORT=6020
+#           LOG_LEVEL=INFO
+#           EOF
+          
+#           # .env 파일 권한 설정 (보안상 중요)
+#           chmod 600 .env
 
-#     - name: Deployment Success Notification
-#       if: success()
-#       run: |
-#         echo "🎉 Deployment successful!"
-#         echo "🌐 LLM Service deployed to ECS"
-#         echo "🏥 Health Check: https://the-second-take.com/llm/api/health"
+#           echo "🔄 기존 서비스를 중지합니다..."
+#           # 포트 기반 정리 (안전함)
+#           echo "포트 6020 정리 중..."
+#           lsof -ti:6020 | xargs -r kill -TERM 2>/dev/null || true
+#           sleep 3
+
+#           # systemctl도 이제 안전하게 사용 가능
+#           if sudo systemctl is-active --quiet llm-outfit-api; then
+#               sudo systemctl stop llm-outfit-api
+#               sleep 3
+#           fi
+#           # echo "1단계: 현재 프로세스 목록 확인"
+#           # ps aux | grep uvicorn | head -5
+
+#           # echo "2단계: 포트 사용 상황 확인"
+#           # netstat -tlnp | grep 6020 || echo "포트 6020 사용 안함"
+
+#           # echo "3단계: lsof로 정리"
+#           # lsof -ti:6020 | head -5 || echo "lsof 결과 없음"
+
+#           # echo "4단계: 실제 정리 실행"
+#           # lsof -ti:6020 | xargs -r kill -TERM 2>/dev/null || echo "kill 명령어 완료"
+
+#           # echo "✅ 모든 단계 완료"
+          
+#           # 서비스 파일 생성
+#           echo "⚙️ 서비스 파일을 생성합니다..."
+#           sudo tee /etc/systemd/system/llm-outfit-api.service > /dev/null <<EOF
+#           [Unit]
+#           Description=TheFirstTake LLM Outfit API
+#           After=network.target
+          
+#           [Service]
+#           Type=simple
+#           User=ubuntu
+#           WorkingDirectory=$PROJECT_DIR
+#           Environment=PATH=$PROJECT_DIR/venv/bin
+#           Environment=ENVIRONMENT=production
+#           Environment=DEBUG=False
+#           Environment=LLM_API_HOST=0.0.0.0
+#           Environment=LLM_API_PORT=6020
+#           Environment=REDIS_HOST=${{ secrets.REDIS_HOST }}
+#           Environment=REDIS_PORT=${{ secrets.REDIS_PORT }}
+#           Environment=AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
+#           Environment=AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
+#           Environment=AWS_REGION=${{ secrets.AWS_REGION }}
+#           Environment=S3_COMBINATION_BUCKET_NAME=${{ secrets.S3_COMBINATION_BUCKET_NAME }}
+#           Environment=S3_COMBINATION_BUCKET_IMAGE_PREFIX=${{ secrets.S3_COMBINATION_BUCKET_IMAGE_PREFIX }}
+#           Environment=S3_COMBINATION_BUCKET_JSON_PREFIX=${{ secrets.S3_COMBINATION_BUCKET_JSON_PREFIX }}
+#           Environment=LOG_LEVEL=INFO
+#           ExecStart=$PROJECT_DIR/venv/bin/uvicorn main:app --host 0.0.0.0 --port 6020
+#           Restart=always
+#           RestartSec=10
+          
+#           [Install]
+#           WantedBy=multi-user.target
+#           EOF
+          
+#           # 서비스 등록 및 시작
+#           echo "🚀 서비스를 시작합니다..."
+#           sudo systemctl daemon-reload
+#           sudo systemctl enable llm-outfit-api
+#           sudo systemctl start llm-outfit-api
+          
+#           # 배포 확인
+#           echo "✅ 배포가 완료되었습니다!"
+#           echo "📍 서버 주소: http://${{ secrets.LLM_OUTFIT_EC2_HOST }}:6020"
+          
+#           # 서비스 상태 확인
+#           sudo systemctl status llm-outfit-api --no-pager
+
+name: Deploy to ECS
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run tests
+      run: |
+        echo "테스트 실행 중..."
+        # python -m pytest
+
+  deploy-llm:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build, tag, and push LLM image
+      id: build-llm
+      env:
+        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_LLM }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        echo "🔨 Building Docker image..."
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        
+        echo "📤 Pushing image to ECR..."
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        
+        echo "✅ Image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    - name: Download current task definition
+      run: |
+        echo "📋 Downloading current task definition..."
+        aws ecs describe-task-definition \
+          --task-definition thefirsttake-llm \
+          --query 'taskDefinition' > task-definition.json
+
+    - name: Update task definition with new image and environment variables
+      id: task-def
+      run: |
+        echo "🔄 Updating task definition..."
+        
+        # 새로운 이미지로 업데이트하고 환경변수 설정
+        jq --arg IMAGE "${{ steps.build-llm.outputs.image }}" \
+           --arg OPENAI_API_KEY "${{ secrets.OPENAI_API_KEY }}" \
+           --arg CLAUDE_API_KEY "${{ secrets.CLAUDE_API_KEY }}" \
+           --arg REDIS_HOST "${{ secrets.REDIS_HOST }}" \
+           --arg REDIS_PORT "${{ secrets.REDIS_PORT }}" \
+           --arg AWS_ACCESS_KEY "${{ secrets.AWS_ACCESS_KEY }}" \
+           --arg AWS_SECRET_KEY "${{ secrets.AWS_SECRET_KEY }}" \
+           --arg AWS_REGION "${{ secrets.AWS_REGION }}" \
+           --arg S3_COMBINATION_BUCKET_NAME "${{ secrets.S3_COMBINATION_BUCKET_NAME }}" \
+           --arg S3_COMBINATION_BUCKET_IMAGE_PREFIX "${{ secrets.S3_COMBINATION_BUCKET_IMAGE_PREFIX }}" \
+           --arg S3_COMBINATION_BUCKET_JSON_PREFIX "${{ secrets.S3_COMBINATION_BUCKET_JSON_PREFIX }}" \
+           '
+           .containerDefinitions[0].image = $IMAGE |
+           .containerDefinitions[0].environment = [
+             {"name": "OPENAI_API_KEY", "value": $OPENAI_API_KEY},
+             {"name": "CLAUDE_API_KEY", "value": $CLAUDE_API_KEY},
+             {"name": "REDIS_HOST", "value": $REDIS_HOST},
+             {"name": "REDIS_PORT", "value": $REDIS_PORT},
+             {"name": "AWS_ACCESS_KEY", "value": $AWS_ACCESS_KEY},
+             {"name": "AWS_SECRET_KEY", "value": $AWS_SECRET_KEY},
+             {"name": "AWS_REGION", "value": $AWS_REGION},
+             {"name": "S3_COMBINATION_BUCKET_NAME", "value": $S3_COMBINATION_BUCKET_NAME},
+             {"name": "S3_COMBINATION_BUCKET_IMAGE_PREFIX", "value": $S3_COMBINATION_BUCKET_IMAGE_PREFIX},
+             {"name": "S3_COMBINATION_BUCKET_JSON_PREFIX", "value": $S3_COMBINATION_BUCKET_JSON_PREFIX},
+             {"name": "ENVIRONMENT", "value": "production"},
+             {"name": "DEBUG", "value": "False"},
+             {"name": "LLM_API_HOST", "value": "0.0.0.0"},
+             {"name": "LLM_API_PORT", "value": "6020"},
+             {"name": "LOG_LEVEL", "value": "INFO"}
+           ] |
+           del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .placementConstraints, .compatibilities, .registeredAt, .registeredBy)
+           ' task-definition.json > new-task-definition.json
+
+    - name: Register new task definition
+      id: register-task-def
+      run: |
+        echo "📝 Registering new task definition..."
+        NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+          --cli-input-json file://new-task-definition.json \
+          --query 'taskDefinition.taskDefinitionArn' \
+          --output text)
+        
+        echo "✅ New task definition: $NEW_TASK_DEF_ARN"
+        echo "task-def-arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+    - name: Debug ECS Variables
+      run: |
+        echo "🔍 Debugging ECS configuration..."
+        echo "ECS_CLUSTER: ${{ env.ECS_CLUSTER }}"
+        echo "ECS_SERVICE_LLM: 'thefirsttake-llm-service-oqrj3cfl'"
+        echo "Length of service name: ${ECS_SERVICE_LLM}"
+    
+    - name: Update ECS LLM Service
+      run: |
+        echo "🚀 Updating ECS service..."
+        SERVICE_NAME="thefirsttake-llm-service-oqrj3cfl"
+        TASK_DEFINITION="${{ steps.register-task-def.outputs.task-def-arn }}"
+        CLUSTER_NAME="the-first-take-cluster"
+        aws ecs update-service --cluster "${CLUSTER_NAME}" --service "${SERVICE_NAME}" --task-definition "${TASK_DEFINITION}" --force-new-deployment
+
+    - name: Wait for service stability
+      run: |
+        echo "⏳ Waiting for service to stabilize..."
+        CLUSTER_NAME="the-first-take-cluster"
+        SERVICE_NAME="thefirsttake-llm-service-oqrj3cfl"
+        aws ecs wait services-stable --cluster "${CLUSTER_NAME}" --services "${SERVICE_NAME}"
+        echo "✅ Service deployment completed!"
+
+  health-check:
+    needs: deploy-llm
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Health Check
+      run: |
+        echo "🔍 Performing health check..."
+        
+        # LLM 서비스의 헬스체크 엔드포인트
+        for i in {1..30}; do
+          if curl -f -s https://the-second-take.com/llm/api/health; then
+            echo "✅ Health check passed!"
+            exit 0
+          fi
+          echo "Waiting for service to be healthy... ($i/30)"
+          sleep 10
+        done
+        
+        echo "❌ Health check failed after 5 minutes!"
+        exit 1
+
+    - name: Deployment Success Notification
+      if: success()
+      run: |
+        echo "🎉 Deployment successful!"
+        echo "🌐 LLM Service deployed to ECS"
+        echo "🏥 Health Check: https://the-second-take.com/llm/api/health"
