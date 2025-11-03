@@ -2279,7 +2279,7 @@ class SimpleFashionExpertService:
         try:
             # Claude API 스트리밍 호출 (anthropic 라이브러리 사용)
             stream = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model=settings.LLM_MODEL_NAME,
                 max_tokens=1000,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],

@@ -2,6 +2,7 @@ import anthropic
 import base64
 import requests
 from urllib.parse import urlparse
+from config import settings
 
 class ClaudeVisionService:
     def __init__(self, api_key: str):
@@ -148,7 +149,7 @@ class ClaudeVisionService:
 5. 반드시 JSON 형식으로만 응답해주세요"""
             
             message = self.client.messages.create(
-                model="claude-3-5-haiku-20241022",
+                model=settings.LLM_MODEL_NAME,
                 max_tokens=1500,
                 messages=[
                     {
@@ -235,7 +236,6 @@ class ClaudeVisionService:
 
 # 전역 인스턴스 생성
 import os
-from config import settings
 
 try:
     claude_vision_service = ClaudeVisionService(api_key=settings.CLAUDE_API_KEY)
