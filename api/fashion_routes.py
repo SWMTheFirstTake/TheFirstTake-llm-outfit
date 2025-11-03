@@ -1278,57 +1278,29 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                     final_filenames = list(set(final_filenames))
 
                     if final_filenames:
-                        yield f"data: {json.dumps({'type': 'status', 'message': f'교집합 후보 {len(final_filenames)}개 발견, 점수 계산 중...', 'step': 7})}\n\n"
+                        yield f"data: {json.dumps({'type': 'status', 'message': f'교집합 후보 {len(final_filenames)}개 발견', 'step': 7})}\n\n"
 
                         recent_used = redis_service.get_recent_used_outfits(request.room_id, limit=20) or []
-                        
-                        # 점수 기반 선택을 위해 모든 후보에 대해 점수 계산
-                        scored_candidates = []
-                        for filename in final_filenames:
-                            try:
-                                json_content = s3_service.get_json_content(filename)
-                                if json_content:
-                                    score = outfit_matcher_service.score_calculator.calculate_match_score(
-                                        request.user_input, json_content, request.expert_type.value
-                                    )
-                                    scored_candidates.append({
-                                        'filename': filename,
-                                        'score': score,
-                                        'content': json_content
-                                    })
-                            except Exception as e:
-                                continue
-                        
-                        # 점수순 정렬
-                        scored_candidates.sort(key=lambda x: x['score'], reverse=True)
-                        
-                        # 최근 사용 제외 후 최고 점수 선택
-                        available = [c for c in scored_candidates if c['filename'] not in recent_used]
-                        if available:
-                            best_match = available[0]
-                        elif scored_candidates:
-                            best_match = scored_candidates[0]
-                        else:
-                            # 점수 계산 실패 시 랜덤 선택
-                            candidate_pick = random.choice(final_filenames)
-                            json_content = s3_service.get_json_content(candidate_pick)
-                            best_match = {
-                                'filename': candidate_pick,
-                                'score': 0.0,
-                                'content': json_content or {}
-                            }
-                        
-                        meta = redis_service.get_json(f"fashion_metadata:{best_match['filename']}") or {}
-                        
+                        available = [fn for fn in final_filenames if fn not in recent_used]
+                        candidate_pick = random.choice(available if available else final_filenames)
+
+                        json_content = s3_service.get_json_content(candidate_pick)
+                        score = (
+                            outfit_matcher_service.score_calculator.calculate_match_score(
+                                request.user_input, json_content, request.expert_type.value
+                            ) if json_content else 0.0
+                        )
+                        meta = redis_service.get_json(f"fashion_metadata:{candidate_pick}") or {}
+
                         selected_match = {
-                            'filename': best_match['filename'],
-                            'content': best_match['content'],
-                            'score': best_match['score'],
+                            'filename': candidate_pick,
+                            'content': json_content or {},
+                            'score': score,
                             's3_url': meta.get('s3_url', '')
                         }
 
                         # 최근 사용 업데이트
-                        recent_used.append(best_match['filename'])
+                        recent_used.append(candidate_pick)
                         if len(recent_used) > 20:
                             recent_used.pop(0)
                         redis_service.set_recent_used_outfits(request.room_id, recent_used)
@@ -1337,8 +1309,6 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                             'matching_count': len(final_filenames),
                             'search_method': 'color_item_index'
                         }
-                        
-                        yield f"data: {json.dumps({'type': 'status', 'message': f'최고 점수 착장 선택: {best_match["filename"]} (점수: {best_match["score"]:.3f})', 'step': 8})}\n\n"
                     else:
                         yield f"data: {json.dumps({'type': 'status', 'message': '교집합 결과 없음 → S3 인덱스 검색으로 전환', 'step': 2})}\n\n"
             except Exception as e:
@@ -1391,7 +1361,7 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                     return
             elif selected_match is None:
                 message = f'S3 매칭 성공: {len(matching_result["matches"])}개 착장 발견'
-                yield f"data: {json.dumps({'type': 'status', 'message': message, 'step': 9})}\n\n"
+                yield f"data: {json.dumps({'type': 'status', 'message': message, 'step': 7})}\n\n"
                 
                 # 기존 로직과 동일한 선택 로직
                 top_matches = matching_result['matches']
@@ -1405,7 +1375,7 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                                    if match['filename'] not in recent_used]
                 
                 if len(available_matches) < 3:
-                    yield f"data: {json.dumps({'type': 'status', 'message': '선택 풀 부족, 전체 DB에서 랜덤 선택...', 'step': 10})}\n\n"
+                    yield f"data: {json.dumps({'type': 'status', 'message': '선택 풀 부족, 전체 DB에서 랜덤 선택...', 'step': 8})}\n\n"
                     all_files = matching_result.get('all_files', [])
                     unused_files = [f for f in all_files if f['filename'] not in recent_used]
                     
@@ -1430,11 +1400,11 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                 if available_matches:
                     selected_match = random.choice(available_matches)
                     message = f'최종 착장 선택: {selected_match["filename"]}'
-                    yield f"data: {json.dumps({'type': 'status', 'message': message, 'step': 11})}\n\n"
+                    yield f"data: {json.dumps({'type': 'status', 'message': message, 'step': 9})}\n\n"
                 else:
                     selected_match = random.choice(selection_pool)
                     message = f'필터링 후 후보 없음, 전체에서 선택: {selected_match["filename"]}'
-                    yield f"data: {json.dumps({'type': 'status', 'message': message, 'step': 12})}\n\n"
+                    yield f"data: {json.dumps({'type': 'status', 'message': message, 'step': 10})}\n\n"
                 
                 # Redis에 최근 사용 추가
                 recent_used.append(selected_match['filename'])
@@ -1442,8 +1412,8 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                     recent_used.pop(0)
                 redis_service.set_recent_used_outfits(request.room_id, recent_used)
             
-            # 전문가 분석 시작
-            yield f"data: {json.dumps({'type': 'status', 'message': '전문가 분석 시작...', 'step': 13})}\n\n"
+            # 2단계: 전문가 분석 시작
+            yield f"data: {json.dumps({'type': 'status', 'message': '전문가 분석 시작...', 'step': 11})}\n\n"
             
             # 선택된 착장 정보 추출
             content = selected_match['content']
@@ -1454,18 +1424,18 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
             expert_service = get_fashion_expert_service()
             if expert_service:
                 request.json_data = extracted_items
-                yield f"data: {json.dumps({'type': 'status', 'message': 'Claude API 호출 중...', 'step': 14})}\n\n"
+                yield f"data: {json.dumps({'type': 'status', 'message': 'Claude API 호출 중...', 'step': 12})}\n\n"
                 
                 # 스트리밍 전문가 분석 호출
                 async for chunk in expert_service.get_single_expert_analysis_stream(request):
                     yield f"data: {json.dumps({'type': 'content', 'chunk': chunk})}\n\n"
                 
-                yield f"data: {json.dumps({'type': 'status', 'message': '전문가 분석 완료', 'step': 15})}\n\n"
+                yield f"data: {json.dumps({'type': 'status', 'message': '전문가 분석 완료', 'step': 13})}\n\n"
             else:
                 # 전문가 서비스가 없으면 기존 방식 사용
                 response = generate_concise_response(extracted_items, situations, request.expert_type.value, selected_match['s3_url'])
                 yield f"data: {json.dumps({'type': 'content', 'chunk': response})}\n\n"
-                yield f"data: {json.dumps({'type': 'status', 'message': '기존 방식 사용 완료', 'step': 16})}\n\n"
+                yield f"data: {json.dumps({'type': 'status', 'message': '기존 방식 사용 완료', 'step': 14})}\n\n"
             
             # Redis에 분석 결과 추가
             analysis_content = f"[{request.expert_type.value}] S3 매칭 결과: {selected_match['filename']}"
