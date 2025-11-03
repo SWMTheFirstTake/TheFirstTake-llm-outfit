@@ -135,6 +135,15 @@ class ScoreCalculator:
                 item_color = item_info.get('color', '').lower()
                 item_fit = item_info.get('fit', '').lower()
 
+                # 색상+아이템 조합 매칭 (예: "블랙 셔츠", "셔츠 블랙")
+                if item_name and item_color:
+                    combined_keyword1 = f"{item_color} {item_name}"
+                    combined_keyword2 = f"{item_name} {item_color}"
+                    if combined_keyword1 in user_input or combined_keyword2 in user_input:
+                        score += 0.8  # 높은 점수로 정확한 매칭 보상
+                        print(f"✅ 색상+아이템 정확 매칭: {combined_keyword1 or combined_keyword2} (+0.8점)")
+                        continue  # 정확 매칭 시 개별 점수는 추가하지 않음
+                
                 if item_name and item_name in user_input:
                     score += 0.3
                 if item_color and item_color in user_input:
