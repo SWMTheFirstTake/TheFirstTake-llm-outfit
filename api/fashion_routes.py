@@ -1257,6 +1257,40 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                 # "셔츠" 입력 시 "티셔츠" 제외하는 로직
                 if "셔츠" in item_candidates and "티셔츠" in item_candidates:
                     item_candidates.remove("티셔츠")
+                
+                # 영어 색상 키워드를 한글 색상 키워드로 매핑 (Redis 인덱스는 한글로 저장되어 있음)
+                color_mapping = {
+                    "블랙": ["검정", "검은", "블랙"],
+                    "화이트": ["흰색", "하얀", "화이트"],
+                    "그레이": ["회색", "그레이"],
+                    "브라운": ["갈색", "브라운"],
+                    "네이비": ["남색", "네이비"],
+                    "베이지": ["베이지"],
+                    "레드": ["빨간", "빨강", "레드"],
+                    "오렌지": ["주황", "오렌지"],
+                    "옐로우": ["노란", "노랑", "옐로우"],
+                    "그린": ["초록", "녹색", "그린"],
+                    "퍼플": ["보라", "퍼플"],
+                    "핑크": ["분홍", "핑크"],
+                    "스카이블루": ["하늘색", "파란", "파랑", "스카이블루"],
+                    "다크블루": ["남색", "다크블루"],
+                    "라이트블루": ["하늘색", "라이트블루"],
+                    "다크그레이": ["회색", "다크그레이"],
+                    "라이트그레이": ["회색", "라이트그레이"],
+                    "실버": ["회색", "실버"],
+                    "골드": ["금색", "골드"],
+                    "골든": ["금색", "골든"],
+                    "카키": ["카키"]
+                }
+                
+                # 영어 키워드를 한글 키워드로 확장
+                expanded_color_candidates = set(color_candidates)
+                for eng_color, kor_colors in color_mapping.items():
+                    if eng_color.lower() in user_input_lower:
+                        expanded_color_candidates.update(kor_colors)
+                        expanded_color_candidates.add(eng_color)  # 원본도 유지
+                
+                color_candidates = list(expanded_color_candidates)
 
                 if color_candidates and item_candidates:
                     yield f"data: {json.dumps({'type': 'status', 'message': '색상+아이템 교집합으로 후보 검색...', 'step': 2})}\n\n"
@@ -1266,7 +1300,7 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                     
                     # 각 색상별로 포함된 키들을 찾아서 파일들 수집
                     for c in color_candidates:
-                        # 색상이 포함된 모든 키 찾기
+                        # 색상이 포함된 모든 키 찾기 (한글 우선, 영어도 포함)
                         color_pattern = f"fashion_index:color:*{c.lower()}*"
                         color_keys = redis_service.keys(color_pattern)
                         color_files = set()
@@ -1300,12 +1334,29 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                                     top_item = extracted_items.get('top', {})
                                     top_color = top_item.get('color', '').lower() if isinstance(top_item, dict) else ''
                                     
-                                    # 상의 색상이 입력된 색상 키워드와 매칭되는지 확인
+                                    # 상의 색상이 입력된 색상 키워드와 매칭되는지 확인 (영어/한글 모두 지원)
                                     color_matched = False
+                                    
+                                    # 원본 입력에서 추출한 색상 키워드들 (영어 포함)
+                                    original_color_candidates = [c for c in color_keywords if c.lower() in user_input_lower]
+                                    
+                                    # 매칭 확인: 확장된 키워드 리스트와 상의 색상 비교
                                     for color_keyword in color_candidates:
-                                        if color_keyword.lower() in top_color or top_color in color_keyword.lower():
+                                        color_keyword_lower = color_keyword.lower()
+                                        if color_keyword_lower in top_color or top_color in color_keyword_lower:
                                             color_matched = True
                                             break
+                                    
+                                    # 영어 키워드가 입력된 경우 한글 매핑으로도 확인
+                                    if not color_matched:
+                                        for eng_color, kor_colors in color_mapping.items():
+                                            if eng_color.lower() in user_input_lower:
+                                                for kor_color in kor_colors:
+                                                    if kor_color.lower() in top_color or top_color in kor_color.lower():
+                                                        color_matched = True
+                                                        break
+                                                if color_matched:
+                                                    break
                                     
                                     if color_matched:
                                         filtered_filenames.append(filename)
