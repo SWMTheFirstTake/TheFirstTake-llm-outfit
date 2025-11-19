@@ -1222,7 +1222,19 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                 user_input_lower = (request.user_input or "").lower()
                 color_keywords = [
                     "블랙", "화이트", "그레이", "브라운", "네이비", "베이지",
-                    "검정", "흰색", "회색", "갈색", "남색"
+                    "검정", "흰색", "회색", "갈색", "남색",
+                    "검은", "검은색", "하얀", "하얀색", "흰", "흰색",
+                    "파란", "파란색", "파랑", "하늘색", "스카이블루",
+                    "빨간", "빨간색", "빨강", "레드", "빨강색",
+                    "주황", "주황색", "오렌지",
+                    "노란", "노란색", "노랑", "옐로우", "노랑색",
+                    "초록", "초록색", "녹색", "그린",
+                    "보라", "보라색", "퍼플", "보랑",
+                    "분홍", "분홍색", "핑크",
+                    "베이지색", "카키", "카키색",
+                    "네이비블루", "다크블루", "라이트블루",
+                    "다크그레이", "라이트그레이", "실버",
+                    "골드", "골든", "금색"
                 ]
                 # 상의/하의 중심 아이템 키워드
                 item_keywords = [
@@ -1276,6 +1288,38 @@ async def single_expert_analysis_stream(request: ExpertAnalysisRequest):
                     
                     # 중복 제거
                     final_filenames = list(set(final_filenames))
+                    
+                    # 상의 색상 필터링: 상의가 검정인 것만 선택
+                    if final_filenames and color_candidates:
+                        filtered_filenames = []
+                        for filename in final_filenames:
+                            try:
+                                json_content = s3_service.get_json_content(filename)
+                                if json_content:
+                                    extracted_items = json_content.get('extracted_items', {})
+                                    top_item = extracted_items.get('top', {})
+                                    top_color = top_item.get('color', '').lower() if isinstance(top_item, dict) else ''
+                                    
+                                    # 상의 색상이 입력된 색상 키워드와 매칭되는지 확인
+                                    color_matched = False
+                                    for color_keyword in color_candidates:
+                                        if color_keyword.lower() in top_color or top_color in color_keyword.lower():
+                                            color_matched = True
+                                            break
+                                    
+                                    if color_matched:
+                                        filtered_filenames.append(filename)
+                            except Exception as e:
+                                # JSON 조회 실패 시 원본 포함
+                                filtered_filenames.append(filename)
+                                continue
+                        
+                        # 필터링된 결과가 있으면 사용, 없으면 원본 사용
+                        if filtered_filenames:
+                            final_filenames = filtered_filenames
+                            yield f"data: {json.dumps({'type': 'status', 'message': f'상의 색상 필터링 후 {len(final_filenames)}개 발견', 'step': 7})}\n\n"
+                        else:
+                            yield f"data: {json.dumps({'type': 'status', 'message': f'상의 색상 필터링 결과 없음, 전체 {len(final_filenames)}개 사용', 'step': 7})}\n\n"
 
                     if final_filenames:
                         yield f"data: {json.dumps({'type': 'status', 'message': f'교집합 후보 {len(final_filenames)}개 발견', 'step': 7})}\n\n"
